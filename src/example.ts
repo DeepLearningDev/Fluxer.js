@@ -4,6 +4,7 @@ import { FluxerClient } from "./core/Client.js";
 import { MockTransport } from "./core/MockTransport.js";
 import { createPermissionGuard } from "./core/Permissions.js";
 import type { FluxerModule } from "./core/types.js";
+import { createEssentialsPlugin } from "./plugins/essentials.js";
 
 const transport = new MockTransport();
 const client = new FluxerClient(transport);
@@ -94,6 +95,11 @@ const utilityModule: FluxerModule = {
 };
 
 bot.module(utilityModule);
+bot.plugin(
+  createEssentialsPlugin({
+    aboutText: "StarterBot runs on Fluxer.JS."
+  })
+);
 
 client.on("ready", ({ connectedAt }) => {
   console.log(`Connected at ${connectedAt.toISOString()}`);
@@ -150,6 +156,21 @@ await transport.injectMessage({
 await transport.injectMessage({
   id: "msg_4",
   content: "!admin",
+  author: {
+    id: "user_1",
+    username: "fluxguy"
+  },
+  channel: {
+    id: "general",
+    name: "general",
+    type: "text"
+  },
+  createdAt: new Date()
+});
+
+await transport.injectMessage({
+  id: "msg_5",
+  content: "!about",
   author: {
     id: "user_1",
     username: "fluxguy"

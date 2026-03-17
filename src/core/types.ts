@@ -19,6 +19,12 @@ export interface FluxerMessage {
   createdAt: Date;
 }
 
+export interface FluxerGuild {
+  id: string;
+  name: string;
+  iconUrl?: string;
+}
+
 export interface MessageBuilderLike {
   toJSON(): Omit<SendMessagePayload, "channelId">;
 }
@@ -175,12 +181,24 @@ export interface FluxerPermissionPolicy {
 export interface FluxerEventMap {
   ready: { connectedAt: Date };
   messageCreate: FluxerMessage;
+  messageUpdate: FluxerMessage;
+  messageDelete: { id: string; channelId: string; guildId?: string };
+  channelCreate: FluxerChannel;
+  channelUpdate: FluxerChannel;
+  channelDelete: { id: string; guildId?: string };
+  guildCreate: FluxerGuild;
+  guildUpdate: FluxerGuild;
+  guildDelete: { id: string };
+  gatewayDispatch: FluxerGatewayDispatchEvent;
   commandExecuted: { commandName: string; message: FluxerMessage };
   error: Error;
 }
 
 export type FluxerMessageHandler = (message: FluxerMessage) => Promise<void> | void;
 export type FluxerErrorHandler = (error: Error) => Promise<void> | void;
+export type FluxerGatewayDispatchHandler = (
+  event: FluxerGatewayDispatchEvent
+) => Promise<void> | void;
 
 export interface FluxerTransport {
   connect(): Promise<void>;
@@ -188,6 +206,7 @@ export interface FluxerTransport {
   sendMessage(payload: SendMessagePayload): Promise<void>;
   onMessage(handler: FluxerMessageHandler): void;
   onError(handler: FluxerErrorHandler): void;
+  onGatewayDispatch(handler: FluxerGatewayDispatchHandler): void;
 }
 
 export interface FluxerReconnectOptions {
@@ -259,6 +278,21 @@ export interface FluxerGatewayTransportOptions {
   createHeartbeatPayload?: (sequence: number | null) => unknown;
   reconnect?: FluxerReconnectOptions;
   parseMessageEvent: (payload: unknown) => FluxerMessage | null;
+  parseDispatchEvent?: (payload: unknown) => FluxerGatewayDispatchEvent | null;
+}
+
+export interface FluxerGatewayEnvelope<T = unknown> {
+  op: number;
+  d: T;
+  s: number | null;
+  t: string | null;
+}
+
+export interface FluxerGatewayDispatchEvent<T = unknown> {
+  type: string;
+  sequence: number | null;
+  data: T;
+  raw: FluxerGatewayEnvelope<T>;
 }
 
 export interface FluxerClientLike {
@@ -272,10 +306,25 @@ export interface FluxerClientLike {
 export interface FluxerBotLike {
   readonly name: string;
   readonly prefix: string;
+  readonly commands: FluxerCommand[];
   command(command: FluxerCommand): this;
   use(middleware: FluxerCommandMiddleware): this;
   guard(guard: FluxerCommandGuard): this;
   hooks(hooks: FluxerCommandExecutionHooks): this;
   module(module: FluxerModule): this;
   installModule(module: FluxerModule): Promise<this>;
+  plugin(plugin: FluxerPlugin): this;
+  installPlugin(plugin: FluxerPlugin): Promise<this>;
+}
+
+export interface FluxerPluginContext {
+  bot: FluxerBotLike;
+  client?: FluxerClientLike;
+}
+
+export interface FluxerPlugin {
+  name: string;
+  description?: string;
+  modules?: FluxerModule[];
+  setup?: (context: FluxerPluginContext) => Promise<void> | void;
 }

@@ -201,6 +201,11 @@ export class GatewayTransport extends BaseTransport {
       return;
     }
 
+    const dispatchEvent = this.#parseDispatchEvent(payload);
+    if (dispatchEvent) {
+      await this.emitGatewayDispatch(dispatchEvent);
+    }
+
     const message = this.#options.parseMessageEvent(payload);
     if (message) {
       await this.emitMessage(message);
@@ -317,5 +322,28 @@ export class GatewayTransport extends BaseTransport {
 
   #normalizeError(error: unknown, fallback: string): Error {
     return error instanceof Error ? error : new Error(fallback);
+  }
+
+  #parseDispatchEvent(payload: unknown) {
+    if (this.#options.parseDispatchEvent) {
+      return this.#options.parseDispatchEvent(payload);
+    }
+
+    const envelope = payload as { t?: string | null; s?: number | null; d?: unknown; op?: number };
+    if (envelope.op !== DISPATCH_OPCODE || typeof envelope.t !== "string") {
+      return null;
+    }
+
+    return {
+      type: envelope.t,
+      sequence: envelope.s ?? null,
+      data: envelope.d,
+      raw: {
+        op: envelope.op,
+        d: envelope.d,
+        s: envelope.s ?? null,
+        t: envelope.t
+      }
+    };
   }
 }

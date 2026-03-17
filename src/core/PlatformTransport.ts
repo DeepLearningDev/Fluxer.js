@@ -1,5 +1,10 @@
 import { BaseTransport } from "./Transport.js";
-import type { FluxerMessageHandler, FluxerTransport, SendMessagePayload } from "./types.js";
+import type {
+  FluxerGatewayDispatchHandler,
+  FluxerMessageHandler,
+  FluxerTransport,
+  SendMessagePayload
+} from "./types.js";
 
 export interface PlatformTransportOptions {
   inbound: FluxerTransport;
@@ -25,6 +30,11 @@ export class PlatformTransport extends BaseTransport {
     super.onError(handler);
     this.#inbound.onError(handler);
     this.#outbound.onError(handler);
+  }
+
+  public override onGatewayDispatch(handler: FluxerGatewayDispatchHandler): void {
+    super.onGatewayDispatch(handler);
+    this.#inbound.onGatewayDispatch(handler);
   }
 
   public async connect(): Promise<void> {

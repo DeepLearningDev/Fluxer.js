@@ -11,6 +11,7 @@ import type {
   FluxerCommand,
   FluxerMessage
 } from "./types.js";
+import type { FluxerPlugin } from "./types.js";
 
 export class FluxerBot {
   readonly name: string;
@@ -24,6 +25,7 @@ export class FluxerBot {
   #middleware: FluxerCommandMiddleware[] = [];
   #hookSets: FluxerCommandExecutionHooks[] = [];
   #modules = new Set<string>();
+  #plugins = new Set<string>();
 
   public constructor(options: FluxerBotOptions) {
     this.name = options.name;
@@ -114,6 +116,46 @@ export class FluxerBot {
 
   public get modules(): string[] {
     return [...this.#modules];
+  }
+
+  public plugin(plugin: FluxerPlugin): this {
+    if (this.#plugins.has(plugin.name)) {
+      return this;
+    }
+
+    for (const module of plugin.modules ?? []) {
+      this.module(module);
+    }
+
+    if (plugin.setup) {
+      const result = plugin.setup({ bot: this });
+      if (this.#isPromiseLike(result)) {
+        throw new Error(
+          `Plugin "${plugin.name}" has async setup. Use installPlugin() instead of plugin().`
+        );
+      }
+    }
+
+    this.#plugins.add(plugin.name);
+    return this;
+  }
+
+  public async installPlugin(plugin: FluxerPlugin): Promise<this> {
+    if (this.#plugins.has(plugin.name)) {
+      return this;
+    }
+
+    for (const module of plugin.modules ?? []) {
+      await this.installModule(module);
+    }
+
+    await Promise.resolve(plugin.setup?.({ bot: this }));
+    this.#plugins.add(plugin.name);
+    return this;
+  }
+
+  public get plugins(): string[] {
+    return [...this.#plugins];
   }
 
   public get commands(): FluxerCommand[] {

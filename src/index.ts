@@ -25,9 +25,11 @@ export {
 export { RestTransport } from "./core/RestTransport.js";
 export { BaseTransport } from "./core/Transport.js";
 export {
+  defaultParseDispatchEvent,
   createFluxerPlatformTransport,
   defaultParseMessageEvent
 } from "./core/createPlatformTransport.js";
+export { createEssentialsPlugin } from "./plugins/essentials.js";
 export type {
   CommandContext,
   FluxerAuth,
@@ -49,17 +51,23 @@ export type {
   FluxerEmbedImage,
   FluxerGuardDecision,
   FluxerGuardResult,
+  FluxerGatewayDispatchEvent,
+  FluxerGatewayEnvelope,
   FluxerGatewayInfo,
   FluxerGatewayTransportOptions,
+  FluxerGuild,
   FluxerInstanceDiscoveryDocument,
   FluxerModule,
   FluxerMessageReference,
   FluxerMessageHandler,
   FluxerMessage,
   FluxerPermissionPolicy,
+  FluxerPlugin,
+  FluxerPluginContext,
   FluxerReconnectOptions,
   FluxerRestTransportOptions,
   FluxerTransport,
+  MessageBuilderLike,
   ParsedCommandInput,
   SendMessagePayload,
   FluxerUser

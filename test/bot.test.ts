@@ -4,8 +4,10 @@ import { FluxerBot } from "../src/core/Bot.js";
 import { EmbedBuilder, MessageBuilder, resolveMessagePayload } from "../src/core/builders.js";
 import { parseCommandInput } from "../src/core/CommandParser.js";
 import { FluxerClient } from "../src/core/Client.js";
+import { defaultParseDispatchEvent } from "../src/core/createPlatformTransport.js";
 import { MockTransport } from "../src/core/MockTransport.js";
 import { createPermissionGuard } from "../src/core/Permissions.js";
+import { createEssentialsPlugin } from "../src/plugins/essentials.js";
 import type { FluxerCommand, FluxerMessage, SendMessagePayload } from "../src/core/types.js";
 
 function createMessage(content: string, overrides: Partial<FluxerMessage> = {}): FluxerMessage {
@@ -269,4 +271,115 @@ test("normalizes string and builder message payloads", () => {
   assert.deepEqual(fromString, { content: "pong" });
   assert.equal(fromBuilder.content, "pong");
   assert.equal(fromBuilder.embeds?.[0]?.title, "Info");
+});
+
+test("maps gateway dispatch events onto client events", async () => {
+  const transport = new MockTransport();
+  const client = new FluxerClient(transport);
+  const events: string[] = [];
+
+  client.on("gatewayDispatch", ({ type }) => {
+    events.push(`dispatch:${type}`);
+  });
+
+  client.on("guildCreate", (guild) => {
+    events.push(`guild:${guild.id}`);
+  });
+
+  client.on("messageDelete", (message) => {
+    events.push(`message-delete:${message.id}`);
+  });
+
+  await client.receiveGatewayDispatch({
+    type: "GUILD_CREATE",
+    sequence: 1,
+    data: {
+      id: "guild_1",
+      name: "Fluxer HQ"
+    },
+    raw: {
+      op: 0,
+      d: {
+        id: "guild_1",
+        name: "Fluxer HQ"
+      },
+      s: 1,
+      t: "GUILD_CREATE"
+    }
+  });
+
+  await client.receiveGatewayDispatch({
+    type: "MESSAGE_DELETE",
+    sequence: 2,
+    data: {
+      id: "msg_9",
+      channel_id: "general"
+    },
+    raw: {
+      op: 0,
+      d: {
+        id: "msg_9",
+        channel_id: "general"
+      },
+      s: 2,
+      t: "MESSAGE_DELETE"
+    }
+  });
+
+  assert.deepEqual(events, [
+    "dispatch:GUILD_CREATE",
+    "guild:guild_1",
+    "dispatch:MESSAGE_DELETE",
+    "message-delete:msg_9"
+  ]);
+});
+
+test("parses raw gateway dispatch envelopes", () => {
+  const event = defaultParseDispatchEvent({
+    op: 0,
+    d: { id: "guild_1" },
+    s: 10,
+    t: "GUILD_DELETE"
+  });
+
+  assert.equal(event?.type, "GUILD_DELETE");
+  assert.equal(event?.sequence, 10);
+});
+
+test("installs plugins and exposes their commands", async () => {
+  const transport = new MockTransport();
+  const client = new FluxerClient(transport);
+  const replies: Array<Omit<SendMessagePayload, "channelId">> = [];
+
+  client.sendMessage = async (_channelId, message) => {
+    if (typeof message === "string") {
+      replies.push({ content: message });
+      return;
+    }
+
+    if ("toJSON" in message && typeof message.toJSON === "function") {
+      replies.push(message.toJSON());
+      return;
+    }
+
+    replies.push(message as Omit<SendMessagePayload, "channelId">);
+  };
+
+  const bot = new FluxerBot({
+    name: "TestBot",
+    prefix: "!"
+  });
+
+  bot.plugin(
+    createEssentialsPlugin({
+      aboutText: "Fluxer.JS keeps the core sharp."
+    })
+  );
+
+  client.registerBot(bot);
+  await client.connect();
+  await transport.injectMessage(createMessage("!about"));
+
+  assert.deepEqual(bot.plugins, ["essentials"]);
+  assert.deepEqual(replies, [{ content: "Fluxer.JS keeps the core sharp." }]);
 });

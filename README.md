@@ -31,6 +31,7 @@ import {
   FluxerBot,
   FluxerClient,
   MessageBuilder,
+  createEssentialsPlugin,
   createPermissionGuard
 } from "fluxer-js";
 import type { FluxerModule } from "fluxer-js";
@@ -90,6 +91,7 @@ const utilityModule: FluxerModule = {
 };
 
 bot.module(utilityModule);
+bot.plugin(createEssentialsPlugin());
 
 client.registerBot(bot);
 await client.connect();
@@ -109,6 +111,12 @@ Rich messages are now builder-driven:
 - `MessageBuilder` composes outbound payloads
 - `EmbedBuilder` handles typed embed construction
 - `client.sendMessage(...)` and `context.reply(...)` accept either strings or rich payloads
+
+Plugins now sit above modules:
+
+- `plugin(...)` installs synchronous packaged features
+- `installPlugin(...)` handles plugins with async setup
+- `createEssentialsPlugin()` provides a reusable higher-level command pack
 
 ## Project layout
 
@@ -169,10 +177,11 @@ Current state is the SDK foundation layer:
 - Modules and declarative permission policies now exist as first-class composition tools
 - Build output and command parsing are now deterministic and test-backed
 - Rich message composition is typed and transport-aware
+- Gateway dispatches and higher-level plugins now have first-class entry points
 
 This is still not a production framework. The biggest missing pieces are:
 
-- Full gateway event opcode and payload coverage
+- More gateway event payload normalization across the full Fluxer surface
 - Rich message payload builders for embeds and attachments
 - Plugin packaging, richer permissions, and more advanced command routing
 - Packaging and versioned API guarantees

@@ -4,6 +4,8 @@ import { PlatformTransport } from "./PlatformTransport.js";
 import { RestTransport } from "./RestTransport.js";
 import type {
   FluxerAuth,
+  FluxerGatewayDispatchEvent,
+  FluxerGatewayEnvelope,
   FluxerGatewayTransportOptions,
   FluxerMessage,
   FluxerTransport
@@ -72,6 +74,7 @@ export async function createFluxerPlatformTransport(
         };
       },
       webSocketFactory: options.webSocketFactory,
+      parseDispatchEvent: defaultParseDispatchEvent,
       parseMessageEvent: options.parseMessageEvent
     }),
     outbound: new RestTransport({
@@ -83,36 +86,50 @@ export async function createFluxerPlatformTransport(
   });
 }
 
-export function defaultParseMessageEvent(payload: unknown): FluxerMessage | null {
-  const event = payload as {
-    type?: string;
-    d?: {
-      id: string;
-      content: string;
-      author: { id: string; username: string; global_name?: string; bot?: boolean };
-      channel_id: string;
-      timestamp: string;
-    };
-  };
+export function defaultParseDispatchEvent(payload: unknown): FluxerGatewayDispatchEvent | null {
+  const envelope = payload as FluxerGatewayEnvelope;
 
-  if (event.type !== "MESSAGE_CREATE" || !event.d) {
+  if (envelope.op !== 0 || typeof envelope.t !== "string") {
     return null;
   }
 
   return {
-    id: event.d.id,
-    content: event.d.content,
+    type: envelope.t,
+    sequence: envelope.s ?? null,
+    data: envelope.d,
+    raw: envelope
+  };
+}
+
+export function defaultParseMessageEvent(payload: unknown): FluxerMessage | null {
+  const event = defaultParseDispatchEvent(payload);
+
+  if (event?.type !== "MESSAGE_CREATE" || !event.data) {
+    return null;
+  }
+
+  const payloadData = event.data as {
+    id: string;
+    content: string;
+    author: { id: string; username: string; global_name?: string; bot?: boolean };
+    channel_id: string;
+    timestamp: string;
+  };
+
+  return {
+    id: payloadData.id,
+    content: payloadData.content,
     author: {
-      id: event.d.author.id,
-      username: event.d.author.username,
-      displayName: event.d.author.global_name,
-      isBot: event.d.author.bot
+      id: payloadData.author.id,
+      username: payloadData.author.username,
+      displayName: payloadData.author.global_name,
+      isBot: payloadData.author.bot
     },
     channel: {
-      id: event.d.channel_id,
-      name: event.d.channel_id,
+      id: payloadData.channel_id,
+      name: payloadData.channel_id,
       type: "text"
     },
-    createdAt: new Date(event.d.timestamp)
+    createdAt: new Date(payloadData.timestamp)
   };
 }
