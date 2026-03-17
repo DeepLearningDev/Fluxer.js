@@ -178,7 +178,7 @@ Current state is the SDK foundation layer:
 - Build output and command parsing are now deterministic and test-backed
 - Rich message composition is typed and transport-aware
 - Gateway dispatches and higher-level plugins now have first-class entry points
-- Gateway normalization now covers members, presence, typing, channels, guilds, and messages
+- Gateway normalization now covers members, presence, typing, roles, reactions, voice, channels, guilds, and messages
 
 This is still not a production framework. The biggest missing pieces are:
 

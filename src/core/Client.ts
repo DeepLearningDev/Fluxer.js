@@ -9,9 +9,13 @@ import type {
   FluxerGuildMember,
   FluxerMessage,
   FluxerPresence,
+  FluxerReactionEvent,
+  FluxerRole,
   FluxerTransport,
   FluxerTypingStartEvent,
   FluxerUser,
+  FluxerVoiceServerUpdate,
+  FluxerVoiceState,
   MessageBuilderLike,
   SendMessagePayload
 } from "./types.js";
@@ -100,6 +104,19 @@ export class FluxerClient extends EventEmitter {
         }
         return;
       }
+      case "MESSAGE_REACTION_ADD":
+      case "MESSAGE_REACTION_REMOVE": {
+        const reaction = this.#parseGatewayReaction(event);
+        if (reaction) {
+          this.emit(
+            event.type === "MESSAGE_REACTION_ADD"
+              ? "messageReactionAdd"
+              : "messageReactionRemove",
+            reaction
+          );
+        }
+        return;
+      }
       case "CHANNEL_CREATE":
       case "CHANNEL_UPDATE": {
         const channel = this.#parseGatewayChannel(event);
@@ -130,6 +147,24 @@ export class FluxerClient extends EventEmitter {
         const payload = event.data as { id?: string };
         if (payload.id) {
           this.emit("guildDelete", { id: payload.id });
+        }
+        return;
+      }
+      case "GUILD_ROLE_CREATE":
+      case "GUILD_ROLE_UPDATE": {
+        const role = this.#parseGatewayRole(event);
+        if (role) {
+          this.emit(event.type === "GUILD_ROLE_CREATE" ? "roleCreate" : "roleUpdate", role);
+        }
+        return;
+      }
+      case "GUILD_ROLE_DELETE": {
+        const payload = event.data as { guild_id?: string; role_id?: string };
+        if (payload.guild_id && payload.role_id) {
+          this.emit("roleDelete", {
+            guildId: payload.guild_id,
+            id: payload.role_id
+          });
         }
         return;
       }
@@ -176,6 +211,20 @@ export class FluxerClient extends EventEmitter {
         const user = this.#parseGatewayUser(event.data);
         if (user) {
           this.emit("userUpdate", user);
+        }
+        return;
+      }
+      case "VOICE_STATE_UPDATE": {
+        const voiceState = this.#parseVoiceState(event);
+        if (voiceState) {
+          this.emit("voiceStateUpdate", voiceState);
+        }
+        return;
+      }
+      case "VOICE_SERVER_UPDATE": {
+        const voiceServer = this.#parseVoiceServerUpdate(event);
+        if (voiceServer) {
+          this.emit("voiceServerUpdate", voiceServer);
         }
         return;
       }
@@ -252,6 +301,32 @@ export class FluxerClient extends EventEmitter {
     };
   }
 
+  #parseGatewayRole(event: FluxerGatewayDispatchEvent): FluxerRole | null {
+    const payload = event.data as {
+      guild_id?: string;
+      role?: {
+        id?: string;
+        name?: string;
+        color?: number;
+        position?: number;
+        permissions?: string;
+      };
+    };
+
+    if (!payload.guild_id || !payload.role?.id || !payload.role.name) {
+      return null;
+    }
+
+    return {
+      id: payload.role.id,
+      guildId: payload.guild_id,
+      name: payload.role.name,
+      color: payload.role.color,
+      position: payload.role.position,
+      permissions: payload.role.permissions
+    };
+  }
+
   #parseGatewayGuildMember(event: FluxerGatewayDispatchEvent): FluxerGuildMember | null {
     const payload = event.data as {
       guild_id?: string;
@@ -315,6 +390,84 @@ export class FluxerClient extends EventEmitter {
       userId: payload.user_id,
       guildId: payload.guild_id,
       startedAt: typeof payload.timestamp === "number" ? new Date(payload.timestamp * 1000) : undefined
+    };
+  }
+
+  #parseGatewayReaction(event: FluxerGatewayDispatchEvent): FluxerReactionEvent | null {
+    const payload = event.data as {
+      user_id?: string;
+      channel_id?: string;
+      message_id?: string;
+      guild_id?: string;
+      emoji?: { id?: string; name?: string; animated?: boolean };
+    };
+
+    if (!payload.user_id || !payload.channel_id || !payload.message_id || !payload.emoji) {
+      return null;
+    }
+
+    return {
+      userId: payload.user_id,
+      channelId: payload.channel_id,
+      messageId: payload.message_id,
+      guildId: payload.guild_id,
+      emoji: {
+        id: payload.emoji.id,
+        name: payload.emoji.name,
+        animated: payload.emoji.animated
+      }
+    };
+  }
+
+  #parseVoiceState(event: FluxerGatewayDispatchEvent): FluxerVoiceState | null {
+    const payload = event.data as {
+      guild_id?: string;
+      channel_id?: string | null;
+      user_id?: string;
+      session_id?: string;
+      deaf?: boolean;
+      mute?: boolean;
+      self_deaf?: boolean;
+      self_mute?: boolean;
+      self_stream?: boolean;
+      self_video?: boolean;
+      suppress?: boolean;
+    };
+
+    if (!payload.user_id || !payload.session_id) {
+      return null;
+    }
+
+    return {
+      guildId: payload.guild_id,
+      channelId: payload.channel_id ?? undefined,
+      userId: payload.user_id,
+      sessionId: payload.session_id,
+      deaf: payload.deaf,
+      mute: payload.mute,
+      selfDeaf: payload.self_deaf,
+      selfMute: payload.self_mute,
+      selfStream: payload.self_stream,
+      selfVideo: payload.self_video,
+      suppress: payload.suppress
+    };
+  }
+
+  #parseVoiceServerUpdate(event: FluxerGatewayDispatchEvent): FluxerVoiceServerUpdate | null {
+    const payload = event.data as {
+      guild_id?: string;
+      token?: string;
+      endpoint?: string | null;
+    };
+
+    if (!payload.guild_id || !payload.token) {
+      return null;
+    }
+
+    return {
+      guildId: payload.guild_id,
+      token: payload.token,
+      endpoint: payload.endpoint ?? undefined
     };
   }
 

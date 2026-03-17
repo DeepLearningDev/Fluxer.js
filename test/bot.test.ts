@@ -500,3 +500,128 @@ test("maps member, presence, typing, and user gateway events", async () => {
     "user:fluxguy"
   ]);
 });
+
+test("maps role, reaction, and voice gateway events", async () => {
+  const transport = new MockTransport();
+  const client = new FluxerClient(transport);
+  const events: string[] = [];
+
+  client.on("roleCreate", (role) => {
+    events.push(`role:${role.id}:${role.name}`);
+  });
+
+  client.on("messageReactionAdd", (reaction) => {
+    events.push(`reaction:${reaction.messageId}:${reaction.emoji.name}`);
+  });
+
+  client.on("voiceStateUpdate", (voiceState) => {
+    events.push(`voice-state:${voiceState.userId}:${voiceState.channelId}`);
+  });
+
+  client.on("voiceServerUpdate", (voiceServer) => {
+    events.push(`voice-server:${voiceServer.guildId}:${voiceServer.endpoint}`);
+  });
+
+  await client.receiveGatewayDispatch({
+    type: "GUILD_ROLE_CREATE",
+    sequence: 7,
+    data: {
+      guild_id: "guild_1",
+      role: {
+        id: "role_1",
+        name: "moderator",
+        color: 0xff0000
+      }
+    },
+    raw: {
+      op: 0,
+      d: {
+        guild_id: "guild_1",
+        role: {
+          id: "role_1",
+          name: "moderator",
+          color: 0xff0000
+        }
+      },
+      s: 7,
+      t: "GUILD_ROLE_CREATE"
+    }
+  });
+
+  await client.receiveGatewayDispatch({
+    type: "MESSAGE_REACTION_ADD",
+    sequence: 8,
+    data: {
+      user_id: "user_1",
+      channel_id: "general",
+      message_id: "msg_1",
+      emoji: {
+        name: "wave"
+      }
+    },
+    raw: {
+      op: 0,
+      d: {
+        user_id: "user_1",
+        channel_id: "general",
+        message_id: "msg_1",
+        emoji: {
+          name: "wave"
+        }
+      },
+      s: 8,
+      t: "MESSAGE_REACTION_ADD"
+    }
+  });
+
+  await client.receiveGatewayDispatch({
+    type: "VOICE_STATE_UPDATE",
+    sequence: 9,
+    data: {
+      guild_id: "guild_1",
+      channel_id: "voice_1",
+      user_id: "user_1",
+      session_id: "session_1",
+      self_mute: false
+    },
+    raw: {
+      op: 0,
+      d: {
+        guild_id: "guild_1",
+        channel_id: "voice_1",
+        user_id: "user_1",
+        session_id: "session_1",
+        self_mute: false
+      },
+      s: 9,
+      t: "VOICE_STATE_UPDATE"
+    }
+  });
+
+  await client.receiveGatewayDispatch({
+    type: "VOICE_SERVER_UPDATE",
+    sequence: 10,
+    data: {
+      guild_id: "guild_1",
+      token: "voice-token",
+      endpoint: "voice.fluxer.app"
+    },
+    raw: {
+      op: 0,
+      d: {
+        guild_id: "guild_1",
+        token: "voice-token",
+        endpoint: "voice.fluxer.app"
+      },
+      s: 10,
+      t: "VOICE_SERVER_UPDATE"
+    }
+  });
+
+  assert.deepEqual(events, [
+    "role:role_1:moderator",
+    "reaction:msg_1:wave",
+    "voice-state:user_1:voice_1",
+    "voice-server:guild_1:voice.fluxer.app"
+  ]);
+});

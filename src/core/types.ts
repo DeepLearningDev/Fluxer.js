@@ -25,6 +25,15 @@ export interface FluxerGuild {
   iconUrl?: string;
 }
 
+export interface FluxerRole {
+  id: string;
+  guildId: string;
+  name: string;
+  color?: number;
+  position?: number;
+  permissions?: string;
+}
+
 export interface FluxerGuildMember {
   user: FluxerUser;
   guildId: string;
@@ -47,6 +56,40 @@ export interface FluxerTypingStartEvent {
   userId: string;
   guildId?: string;
   startedAt?: Date;
+}
+
+export interface FluxerReactionEmoji {
+  id?: string;
+  name?: string;
+  animated?: boolean;
+}
+
+export interface FluxerReactionEvent {
+  userId: string;
+  channelId: string;
+  messageId: string;
+  guildId?: string;
+  emoji: FluxerReactionEmoji;
+}
+
+export interface FluxerVoiceState {
+  guildId?: string;
+  channelId?: string;
+  userId: string;
+  sessionId: string;
+  deaf?: boolean;
+  mute?: boolean;
+  selfDeaf?: boolean;
+  selfMute?: boolean;
+  selfStream?: boolean;
+  selfVideo?: boolean;
+  suppress?: boolean;
+}
+
+export interface FluxerVoiceServerUpdate {
+  guildId: string;
+  token: string;
+  endpoint?: string;
 }
 
 export interface MessageBuilderLike {
@@ -207,18 +250,25 @@ export interface FluxerEventMap {
   messageCreate: FluxerMessage;
   messageUpdate: FluxerMessage;
   messageDelete: { id: string; channelId: string; guildId?: string };
+  messageReactionAdd: FluxerReactionEvent;
+  messageReactionRemove: FluxerReactionEvent;
   channelCreate: FluxerChannel;
   channelUpdate: FluxerChannel;
   channelDelete: { id: string; guildId?: string };
   guildCreate: FluxerGuild;
   guildUpdate: FluxerGuild;
   guildDelete: { id: string };
+  roleCreate: FluxerRole;
+  roleUpdate: FluxerRole;
+  roleDelete: { id: string; guildId: string };
   guildMemberAdd: FluxerGuildMember;
   guildMemberUpdate: FluxerGuildMember;
   guildMemberRemove: { guildId: string; user: FluxerUser };
   presenceUpdate: FluxerPresence;
   typingStart: FluxerTypingStartEvent;
   userUpdate: FluxerUser;
+  voiceStateUpdate: FluxerVoiceState;
+  voiceServerUpdate: FluxerVoiceServerUpdate;
   gatewayDispatch: FluxerGatewayDispatchEvent;
   commandExecuted: { commandName: string; message: FluxerMessage };
   error: Error;
