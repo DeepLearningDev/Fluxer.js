@@ -12,6 +12,7 @@ This bootstrap gives you a clean starting point for a bot SDK:
 - A reusable `FluxerBot` base class
 - Command registration and prefix parsing
 - Middleware, guards, and lifecycle hooks
+- Precise command parsing and duplicate-safe registration
 - An example bot entrypoint for local iteration
 
 ## Getting started
@@ -84,6 +85,13 @@ client.registerBot(bot);
 await client.connect();
 ```
 
+Core command behavior is intentionally strict:
+
+- Command keys are case-insensitive by default
+- Duplicate command names and aliases throw immediately
+- Quoted arguments are parsed as a single argument
+- Empty command invocations are ignored cleanly
+
 ## Project layout
 
 - `src/core` contains the reusable framework pieces
@@ -141,6 +149,7 @@ Current state is the SDK foundation layer:
 - `MockTransport` supports local development while the real Fluxer transport is built
 - Middleware, guard, and hook execution now exist as first-class bot framework features
 - Modules and declarative permission policies now exist as first-class composition tools
+- Build output and command parsing are now deterministic and test-backed
 
 This is still not a production framework. The biggest missing pieces are:
 
@@ -151,6 +160,5 @@ This is still not a production framework. The biggest missing pieces are:
 
 ## Next steps
 
-- Replace the simulated transport with real Fluxer API/websocket adapters
-- Add middleware, permissions, and richer event types
-- Add test coverage around command routing and client lifecycle
+- Expand gateway event coverage and richer message builders
+- Add release packaging and API versioning workflow

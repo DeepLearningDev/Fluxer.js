@@ -123,7 +123,7 @@ await transport.injectMessage({
 
 await transport.injectMessage({
   id: "msg_2",
-  content: "!echo Fluxer bot framework online",
+  content: '!echo "Fluxer bot framework online"',
   author: {
     id: "user_1",
     username: "fluxguy"

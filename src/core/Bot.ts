@@ -1,3 +1,4 @@
+import { parseCommandInput } from "./CommandParser.js";
 import type { FluxerClient } from "./Client.js";
 import type {
   CommandContext,
@@ -14,6 +15,7 @@ export class FluxerBot {
   readonly name: string;
   readonly prefix: string;
   readonly ignoreBots: boolean;
+  readonly caseSensitiveCommands: boolean;
 
   #client?: FluxerClient;
   #commands = new Map<string, FluxerCommand>();
@@ -26,6 +28,7 @@ export class FluxerBot {
     this.name = options.name;
     this.prefix = options.prefix ?? "!";
     this.ignoreBots = options.ignoreBots ?? true;
+    this.caseSensitiveCommands = options.caseSensitiveCommands ?? false;
     this.#guards = [...(options.guards ?? [])];
     this.#middleware = [...(options.middleware ?? [])];
     if (options.hooks) {
@@ -38,10 +41,10 @@ export class FluxerBot {
   }
 
   public command(command: FluxerCommand): this {
-    this.#commands.set(command.name, command);
+    this.#registerCommandKey(command.name, command);
 
     for (const alias of command.aliases ?? []) {
-      this.#commands.set(alias, command);
+      this.#registerCommandKey(alias, command);
     }
 
     return this;
@@ -97,6 +100,14 @@ export class FluxerBot {
     return [...new Set(this.#commands.values())];
   }
 
+  public hasCommand(name: string): boolean {
+    return this.#commands.has(this.#normalizeCommandKey(name));
+  }
+
+  public getCommand(name: string): FluxerCommand | undefined {
+    return this.#commands.get(this.#normalizeCommandKey(name));
+  }
+
   public async handleMessage(message: FluxerMessage): Promise<void> {
     if (!this.#client) {
       throw new Error(`Bot "${this.name}" is not attached to a FluxerClient.`);
@@ -106,16 +117,13 @@ export class FluxerBot {
       return;
     }
 
-    if (!message.content.startsWith(this.prefix)) {
+    const parsedInput = parseCommandInput(message.content, this.prefix);
+    if (!parsedInput) {
       return;
     }
 
-    const [commandName, ...args] = message.content.slice(this.prefix.length).trim().split(/\s+/);
-    if (!commandName) {
-      return;
-    }
-
-    const command = this.#commands.get(commandName);
+    const { commandName, args } = parsedInput;
+    const command = this.#commands.get(this.#normalizeCommandKey(commandName));
     if (!command) {
       await this.#runHook("commandNotFound", {
         client: this.#client,
@@ -240,5 +248,22 @@ export class FluxerBot {
         await hook(payload as never);
       }
     }
+  }
+
+  #registerCommandKey(key: string, command: FluxerCommand): void {
+    const normalizedKey = this.#normalizeCommandKey(key);
+    const existingCommand = this.#commands.get(normalizedKey);
+
+    if (existingCommand && existingCommand !== command) {
+      throw new Error(
+        `Command key "${key}" is already registered by "${existingCommand.name}".`
+      );
+    }
+
+    this.#commands.set(normalizedKey, command);
+  }
+
+  #normalizeCommandKey(name: string): string {
+    return this.caseSensitiveCommands ? name : name.toLowerCase();
   }
 }

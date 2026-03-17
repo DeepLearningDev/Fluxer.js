@@ -1,6 +1,10 @@
 export { FluxerBot } from "./core/Bot.js";
 export { FluxerClient } from "./core/Client.js";
 export {
+  parseCommandInput,
+  tokenizeCommandInput
+} from "./core/CommandParser.js";
+export {
   createBotAuthHeader,
   fetchGatewayInformation,
   fetchInstanceDiscoveryDocument,
@@ -46,6 +50,7 @@ export type {
   FluxerReconnectOptions,
   FluxerRestTransportOptions,
   FluxerTransport,
+  ParsedCommandInput,
   SendMessagePayload,
   FluxerUser
 } from "./core/types.js";

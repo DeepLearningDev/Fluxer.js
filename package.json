@@ -3,17 +3,25 @@
   "version": "0.1.0",
   "description": "TypeScript framework for building bots on Fluxer.",
   "type": "module",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    }
+  },
   "main": "./dist/index.js",
   "types": "./dist/index.d.ts",
   "files": [
-    "dist"
+    "dist",
+    "!dist/test"
   ],
   "scripts": {
-    "build": "tsc -p tsconfig.json",
+    "clean": "powershell -NoProfile -Command \"if (Test-Path dist) { Remove-Item dist -Recurse -Force }\"",
+    "build": "npm run clean && tsc -p tsconfig.build.json",
     "dev": "tsx src/example.ts",
     "start": "node dist/example.js",
     "check": "tsc --noEmit -p tsconfig.json",
-    "test": "node --test dist/test/bot.test.js"
+    "test": "tsx --test test/bot.test.ts"
   },
   "keywords": [
     "fluxer",

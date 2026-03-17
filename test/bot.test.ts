@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { FluxerBot } from "../src/core/Bot.js";
+import { parseCommandInput } from "../src/core/CommandParser.js";
 import { FluxerClient } from "../src/core/Client.js";
 import { MockTransport } from "../src/core/MockTransport.js";
 import { createPermissionGuard } from "../src/core/Permissions.js";
@@ -143,4 +144,58 @@ test("fires commandNotFound hooks for missing commands", async () => {
   await transport.injectMessage(createMessage("!unknown"));
 
   assert.deepEqual(missing, ["unknown"]);
+});
+
+test("parses quoted command arguments", () => {
+  const parsed = parseCommandInput('!say "hello world" test', "!");
+
+  assert.deepEqual(parsed, {
+    commandName: "say",
+    args: ["hello world", "test"]
+  });
+});
+
+test("matches commands case-insensitively by default", async () => {
+  const transport = new MockTransport();
+  const client = new FluxerClient(transport);
+  let executions = 0;
+
+  const bot = new FluxerBot({
+    name: "TestBot",
+    prefix: "!"
+  });
+
+  bot.command({
+    name: "Ping",
+    execute: async () => {
+      executions += 1;
+    }
+  });
+
+  client.registerBot(bot);
+  await client.connect();
+  await transport.injectMessage(createMessage("!ping"));
+
+  assert.equal(executions, 1);
+});
+
+test("throws on duplicate command aliases", () => {
+  const bot = new FluxerBot({
+    name: "TestBot",
+    prefix: "!"
+  });
+
+  bot.command({
+    name: "ping",
+    aliases: ["p"],
+    execute: async () => {}
+  });
+
+  assert.throws(() => {
+    bot.command({
+      name: "pong",
+      aliases: ["p"],
+      execute: async () => {}
+    });
+  }, /already registered/);
 });

@@ -49,6 +49,11 @@ export interface CommandContext {
   reply: (content: string) => Promise<void>;
 }
 
+export interface ParsedCommandInput {
+  commandName: string;
+  args: string[];
+}
+
 export interface FluxerGuardDecision {
   allowed: boolean;
   reason?: string;
@@ -103,6 +108,7 @@ export interface FluxerBotOptions {
   guards?: FluxerCommandGuard[];
   middleware?: FluxerCommandMiddleware[];
   hooks?: FluxerCommandExecutionHooks;
+  caseSensitiveCommands?: boolean;
 }
 
 export interface FluxerModule {
