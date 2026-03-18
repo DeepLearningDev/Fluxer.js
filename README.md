@@ -268,12 +268,51 @@ The current implementation follows the official Fluxer docs:
 - Message send: `POST /v1/channels/{channel_id}/messages`
 - Bot auth header: `Authorization: Bot <token>`
 
+## Gateway Event Contract
+
+`FluxerClient` exposes two layers of gateway events:
+
+- raw `gatewayDispatch`, which gives access to the original gateway envelope after transport parsing
+- normalized high-level events for common bot surfaces like messages, channels, guilds, invites, moderation, members, presence, typing, roles, reactions, and voice
+
+The current normalized event contract is:
+
+- message lifecycle: `messageCreate`, `messageUpdate`, `messageDelete`
+- channel lifecycle: `channelCreate`, `channelUpdate`, `channelDelete`
+- guild lifecycle: `guildCreate`, `guildUpdate`, `guildDelete`
+- role lifecycle: `roleCreate`, `roleUpdate`, `roleDelete`
+- member lifecycle: `guildMemberAdd`, `guildMemberUpdate`, `guildMemberRemove`
+- moderation/invites: `guildBanAdd`, `guildBanRemove`, `inviteCreate`, `inviteDelete`
+- activity/status: `presenceUpdate`, `typingStart`, `userUpdate`
+- reactions/voice: `messageReactionAdd`, `messageReactionRemove`, `voiceStateUpdate`, `voiceServerUpdate`
+- runtime surfaces: `gatewayStateChange`, `gatewaySessionUpdate`, `debug`, `error`
+
+If a Fluxer dispatch is not normalized yet, bot code can still consume it through `gatewayDispatch` without waiting for a new SDK release.
+
 The gateway session layer currently assumes Discord-style gateway lifecycle semantics as an inference from Fluxer's quickstart guidance that the gateway is Discord-compatible. The official lifecycle page is still `TBD`, so the SDK treats these parts as adapter-safe defaults rather than a final protocol guarantee:
 
 - `HELLO` starts the heartbeat loop
 - `HEARTBEAT_ACK` clears the pending heartbeat state
 - `RECONNECT` and invalid session payloads trigger reconnect
 - `IDENTIFY` can be generated automatically from the bot token
+
+## Runtime Guarantees And Assumptions
+
+Current runtime guarantees:
+
+- gateway connection state changes are surfaced through `gatewayStateChange`
+- session updates are surfaced through `gatewaySessionUpdate`
+- resumable sessions are tracked explicitly and reused on reconnect when possible
+- heartbeat ack loss is treated as a transport failure and triggers reconnect
+- invalid sessions distinguish resumable vs non-resumable invalidation
+- transport/protocol failures surface typed errors instead of generic strings
+- raw dispatch access remains available even when a payload is not normalized yet
+
+Current assumptions:
+
+- Fluxer gateway opcodes and session lifecycle are close enough to Discord-style semantics for `HELLO`, `IDENTIFY`, `RESUME`, `RECONNECT`, `INVALID_SESSION`, and `HEARTBEAT_ACK`
+- gateway message parsing and dispatch parsing are adapter-safe defaults, not a final protocol lock
+- unsupported outbound gateway actions should go through `RestTransport` or a composed `PlatformTransport`, not `GatewayTransport` directly
 
 ```ts
 import {

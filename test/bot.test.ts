@@ -1865,6 +1865,7 @@ test("tracks gateway state and resumes sessions on reconnect", async () => {
 test("emits typed protocol errors for invalid sessions", async () => {
   const sockets: FakeWebSocket[] = [];
   const errors: Error[] = [];
+  const sessions: Array<{ sessionId?: string; sequence: number | null; resumable: boolean }> = [];
 
   const transport = new GatewayTransport({
     url: "wss://gateway.fluxer.test",
@@ -1880,6 +1881,9 @@ test("emits typed protocol errors for invalid sessions", async () => {
   transport.onError((error) => {
     errors.push(error);
   });
+  transport.onGatewaySessionUpdate((session) => {
+    sessions.push(session);
+  });
 
   const connectPromise = transport.connect();
   await new Promise((resolve) => setTimeout(resolve, 0));
@@ -1893,6 +1897,14 @@ test("emits typed protocol errors for invalid sessions", async () => {
       heartbeat_interval: 1000
     }
   });
+  socket.emitMessage({
+    op: 0,
+    t: "READY",
+    s: 1,
+    d: {
+      session_id: "session_1"
+    }
+  });
 
   socket.emitMessage({
     op: 9,
@@ -1902,4 +1914,210 @@ test("emits typed protocol errors for invalid sessions", async () => {
 
   assert.ok(errors.some((error) => error instanceof GatewayProtocolError));
   assert.ok(errors.some((error) => error instanceof GatewayTransportError));
+  assert.equal(sessions.at(-1)?.sessionId, undefined);
+  assert.equal(sessions.at(-1)?.resumable, false);
+});
+
+test("resumes after a resumable invalid session", async () => {
+  const sockets: FakeWebSocket[] = [];
+
+  const transport = new GatewayTransport({
+    url: "wss://gateway.fluxer.test",
+    auth: { token: "bot-token" },
+    reconnect: {
+      baseDelayMs: 0,
+      maxDelayMs: 0
+    },
+    webSocketFactory: () => {
+      const socket = new FakeWebSocket();
+      sockets.push(socket);
+      return socket as unknown as WebSocket;
+    },
+    buildIdentifyPayload: ({ auth }) => ({
+      op: 2,
+      d: { token: auth?.token }
+    }),
+    parseMessageEvent: () => null
+  });
+
+  const connectPromise = transport.connect();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  const firstSocket = sockets[0];
+  firstSocket.emitOpen();
+  await connectPromise;
+
+  firstSocket.emitMessage({
+    op: 10,
+    d: {
+      heartbeat_interval: 1000
+    }
+  });
+  await new Promise((resolve) => setTimeout(resolve, 0));
+
+  firstSocket.emitMessage({
+    op: 0,
+    t: "READY",
+    s: 1,
+    d: {
+      session_id: "session_1"
+    }
+  });
+  await new Promise((resolve) => setTimeout(resolve, 0));
+
+  firstSocket.emitMessage({
+    op: 9,
+    d: true
+  });
+  await new Promise((resolve) => setTimeout(resolve, 10));
+
+  const secondSocket = sockets[1];
+  secondSocket.emitOpen();
+  secondSocket.emitMessage({
+    op: 10,
+    d: {
+      heartbeat_interval: 1000
+    }
+  });
+  await new Promise((resolve) => setTimeout(resolve, 0));
+
+  assert.equal(JSON.parse(secondSocket.sent[0]).op, 6);
+});
+
+test("re-identifies after a non-resumable invalid session", async () => {
+  const sockets: FakeWebSocket[] = [];
+
+  const transport = new GatewayTransport({
+    url: "wss://gateway.fluxer.test",
+    auth: { token: "bot-token" },
+    reconnect: {
+      baseDelayMs: 0,
+      maxDelayMs: 0
+    },
+    webSocketFactory: () => {
+      const socket = new FakeWebSocket();
+      sockets.push(socket);
+      return socket as unknown as WebSocket;
+    },
+    buildIdentifyPayload: ({ auth }) => ({
+      op: 2,
+      d: { token: auth?.token }
+    }),
+    parseMessageEvent: () => null
+  });
+
+  const connectPromise = transport.connect();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  const firstSocket = sockets[0];
+  firstSocket.emitOpen();
+  await connectPromise;
+
+  firstSocket.emitMessage({
+    op: 10,
+    d: {
+      heartbeat_interval: 1000
+    }
+  });
+  await new Promise((resolve) => setTimeout(resolve, 0));
+
+  firstSocket.emitMessage({
+    op: 0,
+    t: "READY",
+    s: 1,
+    d: {
+      session_id: "session_1"
+    }
+  });
+  await new Promise((resolve) => setTimeout(resolve, 0));
+
+  firstSocket.emitMessage({
+    op: 9,
+    d: false
+  });
+  await new Promise((resolve) => setTimeout(resolve, 10));
+
+  const secondSocket = sockets[1];
+  secondSocket.emitOpen();
+  secondSocket.emitMessage({
+    op: 10,
+    d: {
+      heartbeat_interval: 1000
+    }
+  });
+  await new Promise((resolve) => setTimeout(resolve, 0));
+
+  assert.equal(JSON.parse(secondSocket.sent[0]).op, 2);
+});
+
+test("reconnects after heartbeat timeout and resumes the session", async () => {
+  const sockets: FakeWebSocket[] = [];
+  const errors: Error[] = [];
+  const states: string[] = [];
+
+  const transport = new GatewayTransport({
+    url: "wss://gateway.fluxer.test",
+    auth: { token: "bot-token" },
+    reconnect: {
+      baseDelayMs: 0,
+      maxDelayMs: 0
+    },
+    webSocketFactory: () => {
+      const socket = new FakeWebSocket();
+      sockets.push(socket);
+      return socket as unknown as WebSocket;
+    },
+    buildIdentifyPayload: ({ auth }) => ({
+      op: 2,
+      d: { token: auth?.token }
+    }),
+    parseMessageEvent: () => null
+  });
+
+  transport.onError((error) => {
+    errors.push(error);
+  });
+  transport.onGatewayStateChange(({ state }) => {
+    states.push(state);
+  });
+
+  const connectPromise = transport.connect();
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  const firstSocket = sockets[0];
+  firstSocket.emitOpen();
+  await connectPromise;
+
+  firstSocket.emitMessage({
+    op: 10,
+    d: {
+      heartbeat_interval: 5
+    }
+  });
+  await new Promise((resolve) => setTimeout(resolve, 0));
+
+  firstSocket.emitMessage({
+    op: 0,
+    t: "READY",
+    s: 1,
+    d: {
+      session_id: "session_1"
+    }
+  });
+
+  await new Promise((resolve) => setTimeout(resolve, 25));
+
+  const secondSocket = sockets[1];
+  secondSocket.emitOpen();
+  secondSocket.emitMessage({
+    op: 10,
+    d: {
+      heartbeat_interval: 1000
+    }
+  });
+  await new Promise((resolve) => setTimeout(resolve, 0));
+
+  assert.equal(JSON.parse(secondSocket.sent[0]).op, 6);
+  assert.ok(errors.some((error) =>
+    error instanceof GatewayTransportError
+    && error.message.includes("heartbeat was not acknowledged")
+  ));
+  assert.ok(states.includes("reconnecting"));
 });

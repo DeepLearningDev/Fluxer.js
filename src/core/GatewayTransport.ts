@@ -270,10 +270,11 @@ export class GatewayTransport extends BaseTransport {
     }
 
     if (this.#isInvalidSessionPayload(payload)) {
+      const canResume = this.#resolveInvalidSessionResumable(payload);
       this.#session = {
-        sessionId: undefined,
+        sessionId: canResume ? this.#session.sessionId : undefined,
         sequence: this.#session.sequence,
-        resumable: false
+        resumable: canResume
       };
       await this.emitGatewaySessionUpdate({ ...this.#session });
       await this.emitError(
@@ -424,6 +425,11 @@ export class GatewayTransport extends BaseTransport {
     return this.#options.isInvalidSessionPayload
       ? this.#options.isInvalidSessionPayload(payload)
       : (payload as { op?: number }).op === INVALID_SESSION_OPCODE;
+  }
+
+  #resolveInvalidSessionResumable(payload: unknown): boolean {
+    const maybePayload = payload as { d?: unknown };
+    return maybePayload.d === true;
   }
 
   #isHeartbeatRequestPayload(payload: unknown): boolean {
