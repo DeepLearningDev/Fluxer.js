@@ -192,6 +192,7 @@ Generated help is now metadata-driven:
 - `!help` now separates standalone commands from command groups
 - `!help <command>` renders detailed usage, arguments, flags, aliases, and examples
 - `!help <group>` renders grouped subcommand help with aliases and usage
+- argument and flag descriptions are rendered directly in detailed help output
 
 Conversation flows now have first-class primitives:
 
@@ -251,9 +252,13 @@ Command metadata can also be inspected programmatically when you want to build y
 
 ```ts
 const catalog = bot.createCommandCatalog();
+const echo = bot.getCommandDescriptor("echo");
+const admin = bot.getCommandGroupDescriptor("admin");
 
 console.log(catalog.commands);
 console.log(catalog.groups);
+console.log(echo?.args);
+console.log(admin?.commands);
 ```
 
 The current implementation follows the official Fluxer docs:

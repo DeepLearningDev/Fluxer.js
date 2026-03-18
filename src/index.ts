@@ -17,6 +17,8 @@ export {
   describeCommandGroup,
   defineCommand,
   defineCommandGroup,
+  findCommandDescriptor,
+  findCommandGroupDescriptor,
   formatCommandUsage,
   formatCommandUsageFromCommand,
   inspectCommand,

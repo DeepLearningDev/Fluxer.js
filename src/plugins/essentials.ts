@@ -2,7 +2,7 @@ import {
   describeCommandCatalog,
   defineCommand,
   describeCommand,
-  describeCommandGroup,
+  describeCommandGroup
 } from "../core/CommandSchema.js";
 import type { FluxerPlugin } from "../core/types.js";
 
@@ -37,19 +37,29 @@ export function createEssentialsPlugin(options: EssentialsPluginOptions = {}): F
                 : "";
 
               if (requestedCommand.length > 0) {
-                const command = bot.resolveCommandFromInput(requestedCommand);
-                if (!command || (!options.includeHiddenCommands && command.hidden)) {
-                  const group = bot.resolveCommandGroup(requestedCommand);
-                  if (group && (options.includeHiddenCommands || !group.hidden)) {
+                const commandDescriptor = bot.getCommandDescriptor(requestedCommand, {
+                  includeHidden: options.includeHiddenCommands
+                });
+                if (commandDescriptor) {
+                  const command = bot.resolveCommandFromInput(commandDescriptor.name);
+                  if (command) {
+                    await reply(describeCommand(command, { prefix: bot.prefix }));
+                    return;
+                  }
+                }
+
+                const groupDescriptor = bot.getCommandGroupDescriptor(requestedCommand, {
+                  includeHidden: options.includeHiddenCommands
+                });
+                if (groupDescriptor) {
+                  const group = bot.resolveCommandGroup(groupDescriptor.name);
+                  if (group) {
                     await reply(describeCommandGroup(group, { prefix: bot.prefix }));
                     return;
                   }
-
-                  await reply(`Unknown command "${requestedCommand}".`);
-                  return;
                 }
 
-                await reply(describeCommand(command, { prefix: bot.prefix }));
+                await reply(`Unknown command "${requestedCommand}".`);
                 return;
               }
 

@@ -225,6 +225,7 @@ export function inspectCommandGroup(
         {
           ...command,
           name: `${group.name} ${command.name}`.trim(),
+          aliases: expandGroupedCommandAliases(group, command),
           hidden: group.hidden || command.hidden,
           group: group.name,
           subcommand: command.name
@@ -282,6 +283,23 @@ export function describeCommandCatalog(catalog: FluxerCommandCatalog): string {
   return sections.join("\n\n");
 }
 
+export function findCommandDescriptor(
+  catalog: FluxerCommandCatalog,
+  input: string
+): FluxerCommandDescriptor | undefined {
+  return catalog.commands.find((command) => command.name === input)
+    ?? catalog.groups
+      .flatMap((group) => group.commands)
+      .find((command) => command.name === input || command.aliases.includes(input));
+}
+
+export function findCommandGroupDescriptor(
+  catalog: FluxerCommandCatalog,
+  input: string
+): FluxerCommandGroupDescriptor | undefined {
+  return catalog.groups.find((group) => group.name === input || group.aliases.includes(input));
+}
+
 export function describeCommand(
   command: Pick<
     FluxerCommand,
@@ -301,19 +319,13 @@ export function describeCommand(
   }
 
   if (descriptor.args.length > 0) {
-    lines.push(
-      `Arguments: ${descriptor.args
-        .map((argument) => formatArgumentDescriptor(argument))
-        .join(", ")}`
-    );
+    lines.push("Arguments:");
+    lines.push(...descriptor.args.map((argument) => `- ${formatArgumentDescriptor(argument)}`));
   }
 
   if (descriptor.flags.length > 0) {
-    lines.push(
-      `Flags: ${descriptor.flags
-        .map((flag) => formatFlagDescriptor(flag))
-        .join("; ")}`
-    );
+    lines.push("Flags:");
+    lines.push(...descriptor.flags.map((flag) => `- ${formatFlagDescriptor(flag)}`));
   }
 
   if (descriptor.examples.length > 0) {
@@ -341,13 +353,34 @@ export function describeCommandGroup(
     lines.push(`Aliases: ${descriptor.aliases.join(", ")}`);
   }
 
-  lines.push(`Subcommands: ${descriptor.commands.map((command) => formatDescriptorSummary(command)).join(" | ")}`);
+  lines.push("Subcommands:");
+  lines.push(...descriptor.commands.map((command) => `- ${formatDescriptorSummary(command)}`));
 
   if (descriptor.examples.length > 0) {
     lines.push(`Examples: ${descriptor.examples.join(" | ")}`);
   }
 
   return lines.join("\n");
+}
+
+function expandGroupedCommandAliases(
+  group: Pick<FluxerCommandGroup, "name" | "aliases">,
+  command: Pick<FluxerCommand, "name" | "aliases">
+): string[] {
+  const aliases = new Set<string>();
+
+  for (const alias of command.aliases ?? []) {
+    aliases.add(`${group.name} ${alias}`.trim());
+  }
+
+  for (const groupAlias of group.aliases ?? []) {
+    aliases.add(`${groupAlias} ${command.name}`.trim());
+    for (const alias of command.aliases ?? []) {
+      aliases.add(`${groupAlias} ${alias}`.trim());
+    }
+  }
+
+  return [...aliases];
 }
 
 function inspectArgument(
@@ -407,7 +440,8 @@ function formatArgumentDescriptor(argument: FluxerCommandArgumentDescriptor): st
     argument.coerced ? "coerced" : undefined
   ].filter(Boolean);
 
-  return `${argument.name}${modifiers.length > 0 ? ` (${modifiers.join(", ")})` : ""}`;
+  const summary = `${argument.name}${modifiers.length > 0 ? ` (${modifiers.join(", ")})` : ""}`;
+  return argument.description ? `${summary}: ${argument.description}` : summary;
 }
 
 function formatFlagDescriptor(flag: FluxerCommandFlagDescriptor): string {
@@ -423,7 +457,8 @@ function formatFlagDescriptor(flag: FluxerCommandFlagDescriptor): string {
     flag.coerced ? "coerced" : undefined
   ].filter(Boolean);
 
-  return `${names}${modifiers.length > 0 ? ` (${modifiers.join(", ")})` : ""}`;
+  const summary = `${names}${modifiers.length > 0 ? ` (${modifiers.join(", ")})` : ""}`;
+  return flag.description ? `${summary}: ${flag.description}` : summary;
 }
 
 function parseArgumentDefinitions(

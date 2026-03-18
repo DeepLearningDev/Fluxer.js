@@ -1135,8 +1135,8 @@ test("generates rich help output from command metadata", async () => {
       description: "Echoes text back to the current channel.",
       examples: ["!echo hello world", "!echo --upper hello world"],
       schema: {
-        args: [{ name: "text", required: true, rest: true }] as const,
-        flags: [{ name: "upper", short: "u" }] as const,
+        args: [{ name: "text", required: true, rest: true, description: "The text to echo back." }] as const,
+        flags: [{ name: "upper", short: "u", description: "Convert the output to uppercase." }] as const,
         allowUnknownFlags: false
       },
       execute: async () => {}
@@ -1162,7 +1162,7 @@ test("generates rich help output from command metadata", async () => {
   );
   assert.equal(
     replies[1]?.content,
-    "Usage: !echo <text...> [-u, --upper]\nEchoes text back to the current channel.\nAliases: say\nArguments: text (required, rest)\nFlags: -u, --upper (optional)\nExamples: !echo hello world | !echo --upper hello world"
+    "Usage: !echo <text...> [-u, --upper]\nEchoes text back to the current channel.\nAliases: say\nArguments:\n- text (required, rest): The text to echo back.\nFlags:\n- -u, --upper (optional): Convert the output to uppercase.\nExamples: !echo hello world | !echo --upper hello world"
   );
 });
 
@@ -1203,7 +1203,7 @@ test("supports command groups and multi-word subcommands", async () => {
             name: "ban",
             description: "Ban a member.",
             schema: {
-              args: [{ name: "target", required: true }] as const
+              args: [{ name: "target", required: true, description: "The member to ban." }] as const
             },
             execute: async ({ input, reply }) => {
               await reply(`banned:${input.args.target}`);
@@ -1240,11 +1240,11 @@ test("supports command groups and multi-word subcommands", async () => {
   );
   assert.equal(
     replies[3]?.content,
-    "Usage: !admin <subcommand>\nAdministrative commands.\nAliases: mod\nSubcommands: !admin ban <target> - Ban a member. | !admin audit-log - View the audit log.\nExamples: !admin ban fluxguy | !admin audit-log"
+    "Usage: !admin <subcommand>\nAdministrative commands.\nAliases: mod\nSubcommands:\n- !admin ban <target> - Ban a member.\n- !admin audit-log - View the audit log.\nExamples: !admin ban fluxguy | !admin audit-log"
   );
   assert.equal(
     replies[4]?.content,
-    "Usage: !admin ban <target>\nBan a member.\nAliases: mod ban\nArguments: target (required)"
+    "Usage: !admin ban <target>\nBan a member.\nAliases: mod ban\nArguments:\n- target (required): The member to ban."
   );
   assert.equal(bot.resolveCommandFromInput("admin ban")?.name, "admin ban");
   assert.equal(bot.resolveCommandGroup("mod")?.name, "admin");
@@ -1348,7 +1348,7 @@ test("creates structured command catalogs from bot metadata", () => {
           name: "admin ban",
           description: "Ban a member.",
           usage: "Usage: !admin ban",
-          aliases: [],
+          aliases: ["mod ban"],
           examples: [],
           hidden: false,
           group: "admin",
@@ -1359,6 +1359,39 @@ test("creates structured command catalogs from bot metadata", () => {
       ]
     }
   ]);
+});
+
+test("resolves command and group descriptors directly from the bot", () => {
+  const bot = new FluxerBot({
+    name: "LookupBot",
+    prefix: "!"
+  });
+
+  bot.command(
+    defineCommandGroup({
+      name: "admin",
+      aliases: ["mod"],
+      commands: [
+        defineCommand({
+          name: "ban",
+          aliases: ["remove"],
+          description: "Ban a member.",
+          schema: {
+            args: [{ name: "target", required: true }] as const
+          },
+          execute: async () => {}
+        })
+      ]
+    })
+  );
+
+  const commandDescriptor = bot.getCommandDescriptor("mod remove");
+  const groupDescriptor = bot.getCommandGroupDescriptor("mod");
+
+  assert.equal(commandDescriptor?.name, "admin ban");
+  assert.deepEqual(commandDescriptor?.aliases, ["admin remove", "mod ban", "mod remove"]);
+  assert.equal(groupDescriptor?.name, "admin");
+  assert.deepEqual(groupDescriptor?.aliases, ["mod"]);
 });
 
 test("maps member, presence, typing, and user gateway events", async () => {

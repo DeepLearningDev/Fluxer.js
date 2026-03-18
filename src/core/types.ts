@@ -681,6 +681,14 @@ export interface FluxerBotLike {
   readonly commandGroups: FluxerCommandGroup[];
   command(command: FluxerCommand | FluxerCommandGroup): this;
   createCommandCatalog(options?: FluxerCommandCatalogOptions): FluxerCommandCatalog;
+  getCommandDescriptor(
+    input: string,
+    options?: FluxerCommandCatalogOptions
+  ): FluxerCommandDescriptor | undefined;
+  getCommandGroupDescriptor(
+    input: string,
+    options?: FluxerCommandCatalogOptions
+  ): FluxerCommandGroupDescriptor | undefined;
   resolveCommandGroup(input: string): FluxerCommandGroup | undefined;
   resolveCommandFromInput(input: string): FluxerCommand | undefined;
   use(middleware: FluxerCommandMiddleware): this;

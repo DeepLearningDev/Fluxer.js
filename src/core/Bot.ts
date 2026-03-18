@@ -2,6 +2,8 @@ import { resolveMessagePayload } from "./builders.js";
 import { parseCommandInput, tokenizeCommandInput } from "./CommandParser.js";
 import {
   createCommandCatalog as buildCommandCatalog,
+  findCommandDescriptor,
+  findCommandGroupDescriptor,
   formatCommandUsage,
   isCommandGroup,
   parseCommandSchemaInput
@@ -207,6 +209,26 @@ export class FluxerBot {
         ...options
       }
     );
+  }
+
+  public getCommandDescriptor(
+    input: string,
+    options: FluxerCommandCatalogOptions = {}
+  ) {
+    const catalog = this.createCommandCatalog(options);
+    const resolvedCommand = this.resolveCommandFromInput(input);
+    const normalizedInput = resolvedCommand?.name ?? input.trim();
+    return findCommandDescriptor(catalog, normalizedInput);
+  }
+
+  public getCommandGroupDescriptor(
+    input: string,
+    options: FluxerCommandCatalogOptions = {}
+  ) {
+    const catalog = this.createCommandCatalog(options);
+    const resolvedGroup = this.resolveCommandGroup(input);
+    const normalizedInput = resolvedGroup?.name ?? input.trim();
+    return findCommandGroupDescriptor(catalog, normalizedInput);
   }
 
   public hasCommand(name: string): boolean {
