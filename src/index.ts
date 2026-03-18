@@ -6,8 +6,10 @@ export {
 } from "./core/builders.js";
 export { FluxerClient } from "./core/Client.js";
 export {
+  describeCommand,
   defineCommand,
   formatCommandUsage,
+  formatCommandUsageFromCommand,
   parseCommandSchemaInput
 } from "./core/CommandSchema.js";
 export {

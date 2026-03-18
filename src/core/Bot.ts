@@ -1,5 +1,5 @@
 import { resolveMessagePayload } from "./builders.js";
-import { parseCommandInput } from "./CommandParser.js";
+import { parseCommandInput, tokenizeCommandInput } from "./CommandParser.js";
 import { formatCommandUsage, parseCommandSchemaInput } from "./CommandSchema.js";
 import type { FluxerClient } from "./Client.js";
 import { CommandSchemaError } from "./errors.js";
@@ -183,6 +183,11 @@ export class FluxerBot {
 
   public getCommand(name: string): AnyCommand | undefined {
     return this.#commands.get(this.#normalizeCommandKey(name));
+  }
+
+  public resolveCommandFromInput(input: string): AnyCommand | undefined {
+    const [commandName] = tokenizeCommandInput(input.trim());
+    return commandName ? this.getCommand(commandName) : undefined;
   }
 
   public async handleMessage(message: FluxerMessage): Promise<void> {

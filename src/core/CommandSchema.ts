@@ -130,7 +130,9 @@ export function formatCommandUsage(
     : "command";
   const argumentParts = (schema.args ?? []).map((argument) => {
     const base = argument.rest
-      ? `<${argument.name}...>`
+      ? argument.required
+        ? `<${argument.name}...>`
+        : `[${argument.name}...]`
       : argument.required
         ? `<${argument.name}>`
         : `[${argument.name}]`;
@@ -142,6 +144,83 @@ export function formatCommandUsage(
   });
 
   return `Usage: ${[commandLabel, ...argumentParts, ...flagParts].join(" ").trim()}`;
+}
+
+export function formatCommandUsageFromCommand(
+  command: Pick<FluxerCommand, "name" | "usage" | "schema">,
+  options?: { prefix?: string }
+): string {
+  if (command.usage) {
+    return command.usage.startsWith("Usage:")
+      ? command.usage
+      : `Usage: ${command.usage}`;
+  }
+
+  if (command.schema) {
+    return formatCommandUsage(command.schema, {
+      prefix: options?.prefix,
+      commandName: command.name
+    });
+  }
+
+  return `Usage: ${(options?.prefix ?? "")}${command.name}`;
+}
+
+export function describeCommand(
+  command: Pick<
+    FluxerCommand,
+    "name" | "aliases" | "description" | "examples" | "usage" | "schema"
+  >,
+  options?: { prefix?: string }
+): string {
+  const lines = [formatCommandUsageFromCommand(command, options)];
+
+  if (command.description) {
+    lines.push(command.description);
+  }
+
+  if (command.aliases && command.aliases.length > 0) {
+    lines.push(`Aliases: ${command.aliases.join(", ")}`);
+  }
+
+  if (command.schema?.args && command.schema.args.length > 0) {
+    lines.push(
+      `Arguments: ${command.schema.args
+        .map((argument) => {
+          const modifiers = [
+            argument.required ? "required" : "optional",
+            argument.rest ? "rest" : undefined,
+            argument.type && argument.type !== "string" ? argument.type : undefined
+          ].filter(Boolean);
+          return `${argument.name}${modifiers.length > 0 ? ` (${modifiers.join(", ")})` : ""}`;
+        })
+        .join(", ")}`
+    );
+  }
+
+  if (command.schema?.flags && command.schema.flags.length > 0) {
+    lines.push(
+      `Flags: ${command.schema.flags
+        .map((flag) => {
+          const names = [flag.short ? `-${flag.short}` : undefined, `--${flag.name}`]
+            .filter(Boolean)
+            .join(", ");
+          const modifiers = [
+            flag.required ? "required" : "optional",
+            flag.type && flag.type !== "boolean" ? flag.type : undefined,
+            flag.multiple ? "multiple" : undefined
+          ].filter(Boolean);
+          return `${names}${modifiers.length > 0 ? ` (${modifiers.join(", ")})` : ""}`;
+        })
+        .join("; ")}`
+    );
+  }
+
+  if (command.examples && command.examples.length > 0) {
+    lines.push(`Examples: ${command.examples.join(" | ")}`);
+  }
+
+  return lines.join("\n");
 }
 
 function parseArgumentDefinitions(

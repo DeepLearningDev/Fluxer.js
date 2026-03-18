@@ -51,6 +51,7 @@ bot.use(async (context, next) => {
 const echoCommand = defineCommand({
   name: "echo",
   description: "Echo back the provided message.",
+  examples: ['!echo "hello world"', '!echo --upper "hello world"'],
   schema: {
     args: [
       { name: "text", required: true, rest: true }
@@ -82,6 +83,7 @@ const utilityModule: FluxerModule = {
     {
       name: "ping",
       description: "Check whether the bot is alive.",
+      examples: ["!ping"],
       execute: async ({ reply, state }: CommandContext) => {
         await reply(
           new MessageBuilder()
@@ -101,6 +103,8 @@ const utilityModule: FluxerModule = {
     {
       name: "admin",
       description: "Restricted command for bot operators.",
+      usage: "!admin",
+      examples: ["!admin"],
       guards: [
         createPermissionGuard({
           allowUserIds: ["user_1"],

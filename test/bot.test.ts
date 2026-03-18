@@ -852,6 +852,68 @@ test("installs plugins and exposes their commands", async () => {
   assert.deepEqual(replies, [{ content: "Fluxer.JS keeps the core sharp." }]);
 });
 
+test("generates rich help output from command metadata", async () => {
+  const transport = new MockTransport();
+  const client = new FluxerClient(transport);
+  const replies: Array<Omit<SendMessagePayload, "channelId">> = [];
+
+  client.sendMessage = async (_channelId, message) => {
+    if (typeof message === "string") {
+      replies.push({ content: message });
+      return;
+    }
+
+    if ("toJSON" in message && typeof message.toJSON === "function") {
+      replies.push(message.toJSON());
+      return;
+    }
+
+    replies.push(message as Omit<SendMessagePayload, "channelId">);
+  };
+
+  const bot = new FluxerBot({
+    name: "TestBot",
+    prefix: "!"
+  });
+
+  bot.command(
+    defineCommand({
+      name: "echo",
+      aliases: ["say"],
+      description: "Echoes text back to the current channel.",
+      examples: ["!echo hello world", "!echo --upper hello world"],
+      schema: {
+        args: [{ name: "text", required: true, rest: true }] as const,
+        flags: [{ name: "upper", short: "u" }] as const,
+        allowUnknownFlags: false
+      },
+      execute: async () => {}
+    })
+  );
+
+  bot.command({
+    name: "secret",
+    hidden: true,
+    execute: async () => {}
+  });
+
+  bot.plugin(createEssentialsPlugin());
+
+  client.registerBot(bot);
+  await client.connect();
+  await transport.injectMessage(createMessage("!help"));
+  await transport.injectMessage(createMessage("!help echo"));
+
+  assert.equal(
+    replies[0]?.content,
+    "Commands:\n!about - Show information about the bot.\n!echo <text...> [-u, --upper] - Echoes text back to the current channel.\n!help [command...] - Show the available commands for the current bot."
+  );
+  assert.equal(
+    replies[1]?.content,
+    "Usage: !echo <text...> [-u, --upper]\nEchoes text back to the current channel.\nAliases: say\nArguments: text (required, rest)\nFlags: -u, --upper (optional)\nExamples: !echo hello world | !echo --upper hello world"
+  );
+});
+
 test("maps member, presence, typing, and user gateway events", async () => {
   const transport = new MockTransport();
   const client = new FluxerClient(transport);

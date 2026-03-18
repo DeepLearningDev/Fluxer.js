@@ -144,6 +144,12 @@ Plugins now sit above modules:
 - `installPlugin(...)` handles plugins with async setup
 - `createEssentialsPlugin()` provides a reusable higher-level command pack
 
+Generated help is now metadata-driven:
+
+- `description`, `usage`, `aliases`, `examples`, and command schemas feed the built-in `help` command
+- hidden commands stay out of the default help surface
+- `!help <command>` renders detailed usage, arguments, flags, aliases, and examples
+
 ## Project layout
 
 - `src/core` contains the reusable framework pieces
