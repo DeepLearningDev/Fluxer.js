@@ -6,6 +6,11 @@ export {
 } from "./core/builders.js";
 export { FluxerClient } from "./core/Client.js";
 export {
+  FluxerMessageCollector,
+  waitForEvent,
+  waitForMessage
+} from "./core/Collectors.js";
+export {
   describeCommand,
   describeCommandGroup,
   defineCommand,
@@ -39,7 +44,8 @@ export {
   CommandSchemaError,
   FluxerError,
   GatewayProtocolError,
-  GatewayTransportError
+  GatewayTransportError,
+  WaitForTimeoutError
 } from "./core/errors.js";
 export { GatewayTransport } from "./core/GatewayTransport.js";
 export { MockTransport } from "./core/MockTransport.js";
@@ -111,6 +117,9 @@ export type {
   FluxerMessageReference,
   FluxerMessageHandler,
   FluxerMessage,
+  FluxerMessageAwaitOptions,
+  FluxerMessageCollectorOptions,
+  FluxerMessageCollectorResult,
   FluxerPresence,
   FluxerPermissionPolicy,
   FluxerParsedCommandInput,

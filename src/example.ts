@@ -109,6 +109,20 @@ const scheduleCommand = defineCommand({
   }
 });
 
+const confirmCommand = defineCommand({
+  name: "confirm",
+  description: "Simple conversational confirmation flow.",
+  examples: ["!confirm"],
+  execute: async ({ reply, awaitReply }) => {
+    await reply("Reply with yes to confirm.");
+    const response = await awaitReply({
+      timeoutMs: 5_000,
+      filter: (message) => message.content.toLowerCase() === "yes"
+    });
+    await reply(`Confirmed: ${response.content}`);
+  }
+});
+
 const utilityModule: FluxerModule = {
   name: "utility",
   commands: [
@@ -133,6 +147,7 @@ const utilityModule: FluxerModule = {
     },
     echoCommand,
     scheduleCommand,
+    confirmCommand,
     defineCommandGroup({
       name: "admin",
       description: "Restricted operator commands.",
@@ -238,8 +253,40 @@ await transport.injectMessage({
   createdAt: new Date()
 });
 
-await transport.injectMessage({
+const confirmFlow = transport.injectMessage({
   id: "msg_5",
+  content: "!confirm",
+  author: {
+    id: "user_1",
+    username: "fluxguy"
+  },
+  channel: {
+    id: "general",
+    name: "general",
+    type: "text"
+  },
+  createdAt: new Date()
+});
+await new Promise((resolve) => setTimeout(resolve, 0));
+
+await transport.injectMessage({
+  id: "msg_6",
+  content: "yes",
+  author: {
+    id: "user_1",
+    username: "fluxguy"
+  },
+  channel: {
+    id: "general",
+    name: "general",
+    type: "text"
+  },
+  createdAt: new Date()
+});
+await confirmFlow;
+
+await transport.injectMessage({
+  id: "msg_7",
   content: "!admin grant",
   author: {
     id: "user_1",
@@ -254,7 +301,7 @@ await transport.injectMessage({
 });
 
 await transport.injectMessage({
-  id: "msg_6",
+  id: "msg_8",
   content: "!help admin",
   author: {
     id: "user_1",
@@ -269,7 +316,7 @@ await transport.injectMessage({
 });
 
 await transport.injectMessage({
-  id: "msg_7",
+  id: "msg_9",
   content: "!about",
   author: {
     id: "user_1",

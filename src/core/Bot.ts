@@ -213,6 +213,7 @@ export class FluxerBot {
     if (!this.#client) {
       throw new Error(`Bot "${this.name}" is not attached to a FluxerClient.`);
     }
+    const client = this.#client;
 
     if (this.ignoreBots && message.author.isBot) {
       return;
@@ -235,7 +236,7 @@ export class FluxerBot {
         }
       });
       await this.#runHook("commandNotFound", {
-        client: this.#client,
+        client,
         bot: this,
         message,
         commandName,
@@ -245,7 +246,7 @@ export class FluxerBot {
     }
 
     const context: CommandContext = {
-      client: this.#client,
+      client,
       bot: this,
       command,
       message,
@@ -254,10 +255,26 @@ export class FluxerBot {
       commandName,
       state: {},
       reply: async (replyMessage) => {
-        await this.#client?.sendMessage(
+        await client.sendMessage(
           message.channel.id,
           resolveMessagePayload(replyMessage)
         );
+      },
+      awaitReply: async (options = {}) => {
+        return client.waitForMessage({
+          authorId: options.authorId ?? message.author.id,
+          channelId: options.channelId ?? message.channel.id,
+          includeBots: options.includeBots,
+          timeoutMs: options.timeoutMs,
+          signal: options.signal,
+          filter: async (replyMessage) => {
+            if (options.filter) {
+              return options.filter(replyMessage);
+            }
+
+            return true;
+          }
+        });
       }
     };
 
@@ -339,7 +356,7 @@ export class FluxerBot {
           durationMs: Date.now() - startedAt
         }
       });
-      this.#client.emit("commandExecuted", { commandName, message });
+      client.emit("commandExecuted", { commandName, message });
     } catch (error) {
       const normalizedError = error instanceof Error ? error : new Error("Command execution failed.");
       this.#emitDebug({
@@ -357,7 +374,7 @@ export class FluxerBot {
         commandContext: context,
         error: normalizedError
       });
-      this.#client.emit("error", normalizedError);
+      client.emit("error", normalizedError);
     }
   }
 

@@ -171,6 +171,7 @@ Core command behavior is intentionally strict:
 - args and flags support `defaultValue`, enum validation, and custom `coerce(...)`
 - multi-word commands resolve to the longest registered command name
 - `defineCommandGroup(...)` expands grouped subcommands without manual name prefixing
+- `context.awaitReply(...)` and `client.waitForMessage(...)` support conversational flows
 
 Rich messages are now builder-driven:
 
@@ -189,6 +190,22 @@ Generated help is now metadata-driven:
 - `description`, `usage`, `aliases`, `examples`, and command schemas feed the built-in `help` command
 - hidden commands stay out of the default help surface
 - `!help <command>` renders detailed usage, arguments, flags, aliases, and examples
+
+Conversation flows now have first-class primitives:
+
+```ts
+bot.command({
+  name: "confirm",
+  execute: async ({ reply, awaitReply }) => {
+    await reply("Reply with yes to confirm.");
+    const response = await awaitReply({
+      timeoutMs: 5_000,
+      filter: (message) => message.content.toLowerCase() === "yes"
+    });
+    await reply(`Confirmed: ${response.content}`);
+  }
+});
+```
 
 ## Project layout
 

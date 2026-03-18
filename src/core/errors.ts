@@ -52,3 +52,9 @@ export class CommandSchemaError extends FluxerError {
     this.usage = options?.usage;
   }
 }
+
+export class WaitForTimeoutError extends FluxerError {
+  public constructor(message: string) {
+    super(message, "WAIT_FOR_TIMEOUT");
+  }
+}

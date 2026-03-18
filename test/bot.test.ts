@@ -10,6 +10,10 @@ import {
 } from "../src/core/CommandSchema.js";
 import { FluxerClient } from "../src/core/Client.js";
 import {
+  FluxerMessageCollector,
+  waitForMessage
+} from "../src/core/Collectors.js";
+import {
   attachDebugHandler,
   createConsoleDebugHandler,
   shouldLogDebugEvent
@@ -20,7 +24,8 @@ import { createFluxerPlatformTransport } from "../src/core/createPlatformTranspo
 import {
   CommandSchemaError,
   GatewayProtocolError,
-  GatewayTransportError
+  GatewayTransportError,
+  WaitForTimeoutError
 } from "../src/core/errors.js";
 import { GatewayTransport } from "../src/core/GatewayTransport.js";
 import { MockTransport } from "../src/core/MockTransport.js";
@@ -757,6 +762,129 @@ test("uses schema defaults and coercion during command execution", async () => {
   assert.deepEqual(replies, [
     { content: "backups:normal:0" },
     { content: "backups:high:10" }
+  ]);
+});
+
+test("waits for a matching message", async () => {
+  const transport = new MockTransport();
+  const client = new FluxerClient(transport);
+
+  await client.connect();
+
+  const waitPromise = waitForMessage(client, {
+    authorId: "user_2",
+    channelId: "general",
+    timeoutMs: 1000
+  });
+
+  await transport.injectMessage(
+    createMessage("not this one", {
+      author: {
+        id: "user_1",
+        username: "fluxguy"
+      }
+    })
+  );
+
+  await transport.injectMessage(
+    createMessage("this one", {
+      id: "msg_wait",
+      author: {
+        id: "user_2",
+        username: "replyguy"
+      }
+    })
+  );
+
+  const message = await waitPromise;
+  assert.equal(message.id, "msg_wait");
+});
+
+test("times out when waiting for a message", async () => {
+  const transport = new MockTransport();
+  const client = new FluxerClient(transport);
+
+  await client.connect();
+
+  await assert.rejects(
+    () =>
+      client.waitForMessage({
+        authorId: "user_9",
+        timeoutMs: 10
+      }),
+    WaitForTimeoutError
+  );
+});
+
+test("collects messages until the max is reached", async () => {
+  const transport = new MockTransport();
+  const client = new FluxerClient(transport);
+
+  await client.connect();
+
+  const collector = new FluxerMessageCollector(client, {
+    channelId: "general",
+    max: 2
+  });
+
+  await transport.injectMessage(createMessage("first"));
+  await transport.injectMessage(createMessage("second"));
+
+  const result = await collector.wait();
+  assert.equal(result.reason, "limit");
+  assert.deepEqual(
+    result.collected.map((message) => message.content),
+    ["first", "second"]
+  );
+});
+
+test("supports conversational command replies through awaitReply", async () => {
+  const transport = new MockTransport();
+  const client = new FluxerClient(transport);
+  const replies: Array<Omit<SendMessagePayload, "channelId">> = [];
+
+  client.sendMessage = async (_channelId, message) => {
+    if (typeof message === "string") {
+      replies.push({ content: message });
+      return;
+    }
+
+    if ("toJSON" in message && typeof message.toJSON === "function") {
+      replies.push(message.toJSON());
+      return;
+    }
+
+    replies.push(message as Omit<SendMessagePayload, "channelId">);
+  };
+
+  const bot = new FluxerBot({
+    name: "ConversationBot",
+    prefix: "!"
+  });
+
+  bot.command({
+    name: "confirm",
+    execute: async ({ reply, awaitReply }) => {
+      await reply("Reply with yes to confirm.");
+      const response = await awaitReply({
+        timeoutMs: 1000,
+        filter: (message) => message.content.toLowerCase() === "yes"
+      });
+      await reply(`confirmed:${response.content}`);
+    }
+  });
+
+  client.registerBot(bot);
+  await client.connect();
+
+  const commandPromise = transport.injectMessage(createMessage("!confirm"));
+  await new Promise((resolve) => setTimeout(resolve, 0));
+  await transport.injectMessage(createMessage("yes", { id: "msg_yes" }));
+  await commandPromise;
+
+  assert.deepEqual(replies, [
+    { content: "Reply with yes to confirm." },
+    { content: "confirmed:yes" }
   ]);
 });
 

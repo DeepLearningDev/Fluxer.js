@@ -266,6 +266,7 @@ export interface CommandContext<
   reply: (
     message: string | Omit<SendMessagePayload, "channelId"> | MessageBuilderLike
   ) => Promise<void>;
+  awaitReply: (options?: FluxerMessageAwaitOptions) => Promise<FluxerMessage>;
 }
 
 export interface ParsedCommandInput {
@@ -476,6 +477,30 @@ export interface FluxerDebugEvent {
   data?: Record<string, unknown>;
 }
 
+export interface FluxerWaitForOptions<TPayload> {
+  filter?: (payload: TPayload) => boolean | Promise<boolean>;
+  timeoutMs?: number;
+  signal?: AbortSignal;
+}
+
+export interface FluxerMessageAwaitOptions extends FluxerWaitForOptions<FluxerMessage> {
+  authorId?: string;
+  channelId?: string;
+  includeBots?: boolean;
+}
+
+export type FluxerCollectorStopReason = "manual" | "limit" | "timeout" | "idle" | "abort";
+
+export interface FluxerMessageCollectorOptions extends FluxerMessageAwaitOptions {
+  max?: number;
+  idleMs?: number;
+}
+
+export interface FluxerMessageCollectorResult {
+  collected: FluxerMessage[];
+  reason: FluxerCollectorStopReason;
+}
+
 export interface FluxerGatewayInfo {
   url: string;
   shards: number;
@@ -587,6 +612,7 @@ export interface FluxerGatewayDispatchEvent<T = unknown> {
 export interface FluxerClientLike {
   isConnected(): boolean;
   emitDebug?(event: Omit<FluxerDebugEvent, "timestamp"> & { timestamp?: string }): void;
+  waitForMessage?(options?: FluxerMessageAwaitOptions): Promise<FluxerMessage>;
   sendMessage(
     channelId: string,
     message: string | Omit<SendMessagePayload, "channelId"> | MessageBuilderLike

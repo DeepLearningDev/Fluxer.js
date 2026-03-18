@@ -1,5 +1,6 @@
 import { EventEmitter } from "node:events";
 import { resolveMessagePayload } from "./builders.js";
+import { FluxerMessageCollector, waitForEvent, waitForMessage } from "./Collectors.js";
 import type { FluxerBot } from "./Bot.js";
 import type {
   FluxerChannel,
@@ -10,6 +11,8 @@ import type {
   FluxerGuildMember,
   FluxerInvite,
   FluxerMessage,
+  FluxerMessageAwaitOptions,
+  FluxerMessageCollectorOptions,
   FluxerPresence,
   FluxerReactionEvent,
   FluxerRole,
@@ -99,6 +102,81 @@ export class FluxerClient extends EventEmitter {
 
   public isConnected(): boolean {
     return this.#connected;
+  }
+
+  public waitFor<E extends EventKey>(
+    eventName: E,
+    options?: {
+      filter?: (payload: FluxerEventMap[E]) => boolean | Promise<boolean>;
+      timeoutMs?: number;
+      signal?: AbortSignal;
+    }
+  ): Promise<FluxerEventMap[E]> {
+    this.emitDebug({
+      scope: "client",
+      event: "wait_for_started",
+      level: "debug",
+      data: {
+        eventName: String(eventName),
+        timeoutMs: options?.timeoutMs
+      }
+    });
+
+    return waitForEvent(this, eventName, options)
+      .then((payload) => {
+        this.emitDebug({
+          scope: "client",
+          event: "wait_for_resolved",
+          level: "debug",
+          data: {
+            eventName: String(eventName)
+          }
+        });
+        return payload;
+      })
+      .catch((error) => {
+        this.emitDebug({
+          scope: "client",
+          event: "wait_for_failed",
+          level: "warn",
+          data: {
+            eventName: String(eventName),
+            message: error instanceof Error ? error.message : "Unknown waitFor error."
+          }
+        });
+        throw error;
+      });
+  }
+
+  public waitForMessage(options?: FluxerMessageAwaitOptions): Promise<FluxerMessage> {
+    return waitForMessage(this, options);
+  }
+
+  public createMessageCollector(options?: FluxerMessageCollectorOptions): FluxerMessageCollector {
+    this.emitDebug({
+      scope: "client",
+      event: "message_collector_started",
+      level: "debug",
+      data: {
+        timeoutMs: options?.timeoutMs,
+        idleMs: options?.idleMs,
+        max: options?.max
+      }
+    });
+
+    const collector = new FluxerMessageCollector(this, options);
+    collector.once("end", ({ reason, collected }) => {
+      this.emitDebug({
+        scope: "client",
+        event: "message_collector_finished",
+        level: "debug",
+        data: {
+          reason,
+          collected: collected.length
+        }
+      });
+    });
+    return collector;
   }
 
   public registerBot(bot: FluxerBot): void {
