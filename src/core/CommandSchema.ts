@@ -199,7 +199,10 @@ export function describeCommand(
           const modifiers = [
             argument.required ? "required" : "optional",
             argument.rest ? "rest" : undefined,
-            argument.type && argument.type !== "string" ? argument.type : undefined
+            argument.type && argument.type !== "string" ? argument.type : undefined,
+            argument.defaultValue !== undefined ? `default=${String(argument.defaultValue)}` : undefined,
+            argument.enum && argument.enum.length > 0 ? `enum=${argument.enum.join("/")}` : undefined,
+            argument.coerce ? "coerced" : undefined
           ].filter(Boolean);
           return `${argument.name}${modifiers.length > 0 ? ` (${modifiers.join(", ")})` : ""}`;
         })
@@ -217,7 +220,10 @@ export function describeCommand(
           const modifiers = [
             flag.required ? "required" : "optional",
             flag.type && flag.type !== "boolean" ? flag.type : undefined,
-            flag.multiple ? "multiple" : undefined
+            flag.multiple ? "multiple" : undefined,
+            flag.defaultValue !== undefined ? `default=${String(flag.defaultValue)}` : undefined,
+            flag.enum && flag.enum.length > 0 ? `enum=${flag.enum.join("/")}` : undefined,
+            flag.coerce ? "coerced" : undefined
           ].filter(Boolean);
           return `${names}${modifiers.length > 0 ? ` (${modifiers.join(", ")})` : ""}`;
         })
@@ -287,7 +293,12 @@ function parseArgumentDefinitions(
       }
 
       result[definition.name] = restTokens.map((token) =>
-        coerceSchemaValue(token, getArgumentType(definition), `argument "${definition.name}"`)
+        coerceSchemaValue(
+          token,
+          definition,
+          `argument "${definition.name}"`,
+          getArgumentType(definition)
+        )
       );
       position = positionalTokens.length;
       continue;
@@ -301,14 +312,15 @@ function parseArgumentDefinitions(
         });
       }
 
-      result[definition.name] = undefined;
+      result[definition.name] = definition.defaultValue;
       continue;
     }
 
     result[definition.name] = coerceSchemaValue(
       token,
-      getArgumentType(definition),
-      `argument "${definition.name}"`
+      definition,
+      `argument "${definition.name}"`,
+      getArgumentType(definition)
     );
     position += 1;
   }
@@ -343,7 +355,12 @@ function parseFlagDefinitions(
     }
 
     const coercedValues = values.map((value) =>
-      coerceSchemaValue(value, getFlagType(definition), `flag "--${definition.name}"`)
+      coerceSchemaValue(
+        value,
+        definition,
+        `flag "--${definition.name}"`,
+        getFlagType(definition)
+      )
     );
 
     if (definition.multiple) {
@@ -359,19 +376,43 @@ function parseFlagDefinitions(
 
 function coerceSchemaValue(
   value: string,
-  type: FluxerCommandValueType,
-  fieldName: string
+  definition: Pick<
+    FluxerCommandArgumentDefinition | FluxerCommandFlagDefinition,
+    "type" | "enum" | "coerce"
+  >,
+  fieldName: string,
+  defaultType: FluxerCommandValueType
 ): FluxerSchemaValue {
+  if (definition.coerce) {
+    try {
+      const coercedValue = definition.coerce(value);
+      validateEnumValue(coercedValue, definition.enum, fieldName);
+      return coercedValue;
+    } catch (error) {
+      if (error instanceof CommandSchemaError) {
+        throw error;
+      }
+
+      const message = error instanceof Error ? error.message : `Invalid value for ${fieldName}.`;
+      throw new CommandSchemaError(message);
+    }
+  }
+
+  const type = definition.type ?? defaultType;
   if (type === "string") {
+    validateEnumValue(value, definition.enum, fieldName);
     return value;
   }
 
   if (type === "boolean") {
-    if (value === "true") {
+    const normalizedValue = value.toLowerCase();
+    if (["true", "1", "yes", "on"].includes(normalizedValue)) {
+      validateEnumValue(true, definition.enum, fieldName);
       return true;
     }
 
-    if (value === "false") {
+    if (["false", "0", "no", "off"].includes(normalizedValue)) {
+      validateEnumValue(false, definition.enum, fieldName);
       return false;
     }
 
@@ -379,19 +420,20 @@ function coerceSchemaValue(
   }
 
   const numericValue = Number(value);
-  if (Number.isNaN(numericValue)) {
+  if (Number.isNaN(numericValue) || !Number.isFinite(numericValue)) {
     throw new CommandSchemaError(`Invalid number for ${fieldName}.`);
   }
 
+  validateEnumValue(numericValue, definition.enum, fieldName);
   return numericValue;
 }
 
 function getArgumentType(definition: FluxerCommandArgumentDefinition): FluxerCommandValueType {
-  return definition.type ?? "string";
+  return definition.type ?? inferSchemaValueType(definition.defaultValue ?? definition.enum?.[0]) ?? "string";
 }
 
 function getFlagType(definition: FluxerCommandFlagDefinition): FluxerCommandValueType {
-  return definition.type ?? "boolean";
+  return definition.type ?? inferSchemaValueType(definition.defaultValue ?? definition.enum?.[0]) ?? "boolean";
 }
 
 function recordFlagValue(rawFlags: Map<string, string[]>, name: string, value: string): void {
@@ -411,4 +453,36 @@ function splitInlineFlag(token: string): [string, string | undefined] {
   }
 
   return [token.slice(0, separatorIndex), token.slice(separatorIndex + 1)];
+}
+
+function validateEnumValue(
+  value: FluxerSchemaValue,
+  allowedValues: readonly FluxerSchemaValue[] | undefined,
+  fieldName: string
+): void {
+  if (!allowedValues || allowedValues.length === 0) {
+    return;
+  }
+
+  if (!allowedValues.includes(value)) {
+    throw new CommandSchemaError(
+      `Invalid value for ${fieldName}. Expected one of: ${allowedValues.join(", ")}.`
+    );
+  }
+}
+
+function inferSchemaValueType(value: FluxerSchemaValue | undefined): FluxerCommandValueType | undefined {
+  if (typeof value === "number") {
+    return "number";
+  }
+
+  if (typeof value === "boolean") {
+    return "boolean";
+  }
+
+  if (typeof value === "string") {
+    return "string";
+  }
+
+  return undefined;
 }

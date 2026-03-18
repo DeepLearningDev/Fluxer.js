@@ -77,6 +77,38 @@ const echoCommand = defineCommand({
   }
 });
 
+const scheduleCommand = defineCommand({
+  name: "schedule",
+  description: "Schedule a task with typed defaults and coercion.",
+  examples: ["!schedule backups", "!schedule backups high --delay 10m"],
+  schema: {
+    args: [
+      { name: "task", required: true },
+      { name: "priority", enum: ["low", "normal", "high"] as const, defaultValue: "normal" }
+    ] as const,
+    flags: [
+      {
+        name: "delay",
+        type: "number",
+        defaultValue: 0,
+        coerce: (value) => {
+          if (!value.endsWith("m")) {
+            throw new Error('Delay must end with "m".');
+          }
+
+          return Number(value.slice(0, -1));
+        }
+      }
+    ] as const,
+    allowUnknownFlags: false
+  },
+  execute: async ({ input, reply }) => {
+    await reply(
+      `Scheduled ${input.args.task} with priority ${input.args.priority} after ${input.flags.delay}m.`
+    );
+  }
+});
+
 const utilityModule: FluxerModule = {
   name: "utility",
   commands: [
@@ -100,6 +132,7 @@ const utilityModule: FluxerModule = {
       }
     },
     echoCommand,
+    scheduleCommand,
     defineCommandGroup({
       name: "admin",
       description: "Restricted operator commands.",
@@ -192,7 +225,7 @@ await transport.injectMessage({
 
 await transport.injectMessage({
   id: "msg_4",
-  content: "!admin grant",
+  content: "!schedule backups high --delay 10m",
   author: {
     id: "user_1",
     username: "fluxguy"
@@ -207,7 +240,7 @@ await transport.injectMessage({
 
 await transport.injectMessage({
   id: "msg_5",
-  content: "!help admin",
+  content: "!admin grant",
   author: {
     id: "user_1",
     username: "fluxguy"
@@ -222,6 +255,21 @@ await transport.injectMessage({
 
 await transport.injectMessage({
   id: "msg_6",
+  content: "!help admin",
+  author: {
+    id: "user_1",
+    username: "fluxguy"
+  },
+  channel: {
+    id: "general",
+    name: "general",
+    type: "text"
+  },
+  createdAt: new Date()
+});
+
+await transport.injectMessage({
+  id: "msg_7",
   content: "!about",
   author: {
     id: "user_1",

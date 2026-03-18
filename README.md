@@ -122,6 +122,30 @@ const utilityModule: FluxerModule = {
         const text = input.args.text.join(" ");
         await reply(input.flags.upper ? text.toUpperCase() : text);
       }
+    }),
+    defineCommand({
+      name: "schedule",
+      description: "Schedules a task with schema defaults and coercion.",
+      schema: {
+        args: [
+          { name: "task", required: true },
+          { name: "priority", enum: ["low", "normal", "high"], defaultValue: "normal" }
+        ],
+        flags: [
+          {
+            name: "delay",
+            type: "number",
+            defaultValue: 0,
+            coerce: (value) => Number(value.replace(/m$/, ""))
+          }
+        ],
+        allowUnknownFlags: false
+      },
+      execute: async ({ input, reply }) => {
+        await reply(
+          `${input.args.task}:${input.args.priority}:${input.flags.delay}`
+        );
+      }
     })
   ]
 };
@@ -144,6 +168,7 @@ Core command behavior is intentionally strict:
 - Schema-defined args and flags are validated before execution
 - Invalid schema input replies with a usage string by default
 - `defineCommand(...)` preserves typed `input.args` and `input.flags`
+- args and flags support `defaultValue`, enum validation, and custom `coerce(...)`
 - multi-word commands resolve to the longest registered command name
 - `defineCommandGroup(...)` expands grouped subcommands without manual name prefixing
 

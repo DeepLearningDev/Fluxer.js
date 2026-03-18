@@ -212,6 +212,9 @@ export interface FluxerCommandArgumentDefinition<
   description?: string;
   required?: boolean;
   rest?: boolean;
+  enum?: readonly FluxerResolvedCommandValue<TType>[];
+  defaultValue?: FluxerResolvedCommandValue<TType>;
+  coerce?: (value: string) => FluxerResolvedCommandValue<TType>;
 }
 
 export interface FluxerCommandFlagDefinition<
@@ -224,7 +227,9 @@ export interface FluxerCommandFlagDefinition<
   description?: string;
   required?: boolean;
   multiple?: boolean;
+  enum?: readonly FluxerResolvedCommandValue<TType>[];
   defaultValue?: FluxerResolvedCommandValue<TType>;
+  coerce?: (value: string) => FluxerResolvedCommandValue<TType>;
 }
 
 export interface FluxerCommandSchema<

@@ -574,6 +574,59 @@ test("parses schema-based command args and flags", () => {
   });
 });
 
+test("applies schema defaults, enum validation, and custom coercion", () => {
+  const parsed = parseCommandSchemaInput(
+    ["yes", "--mode", "slow", "--duration", "5m"],
+    {
+      args: [
+        { name: "enabled", type: "boolean", defaultValue: false },
+        { name: "priority", enum: ["low", "normal", "high"] as const, defaultValue: "normal" }
+      ] as const,
+      flags: [
+        { name: "mode", enum: ["fast", "slow"] as const, defaultValue: "fast" },
+        {
+          name: "duration",
+          type: "number",
+          coerce: (value) => {
+            if (!value.endsWith("m")) {
+              throw new Error('Duration must end with "m".');
+            }
+
+            return Number(value.slice(0, -1));
+          }
+        }
+      ] as const,
+      allowUnknownFlags: false
+    },
+    { prefix: "!", commandName: "schedule" }
+  );
+
+  assert.deepEqual(parsed, {
+    args: {
+      enabled: true,
+      priority: "normal"
+    },
+    flags: {
+      mode: "slow",
+      duration: 5
+    },
+    rawArgs: ["yes", "--mode", "slow", "--duration", "5m"],
+    unknownFlags: []
+  });
+
+  assert.throws(() => {
+    parseCommandSchemaInput(
+      ["maybe"],
+      {
+        args: [
+          { name: "priority", enum: ["low", "normal", "high"] as const }
+        ] as const
+      },
+      { prefix: "!", commandName: "schedule" }
+    );
+  }, /Expected one of: low, normal, high/);
+});
+
 test("replies with schema validation errors and exposes typed parsed input", async () => {
   const transport = new MockTransport();
   const client = new FluxerClient(transport);
@@ -638,6 +691,73 @@ test("replies with schema validation errors and exposes typed parsed input", asy
     replies[0]?.content,
     'Invalid number for argument "days".\nUsage: !ban <target> <days> [-s, --silent]'
   );
+});
+
+test("uses schema defaults and coercion during command execution", async () => {
+  const transport = new MockTransport();
+  const client = new FluxerClient(transport);
+  const replies: Array<Omit<SendMessagePayload, "channelId">> = [];
+
+  client.sendMessage = async (_channelId, message) => {
+    if (typeof message === "string") {
+      replies.push({ content: message });
+      return;
+    }
+
+    if ("toJSON" in message && typeof message.toJSON === "function") {
+      replies.push(message.toJSON());
+      return;
+    }
+
+    replies.push(message as Omit<SendMessagePayload, "channelId">);
+  };
+
+  const bot = new FluxerBot({
+    name: "SchemaBot",
+    prefix: "!"
+  });
+
+  bot.command(
+    defineCommand({
+      name: "schedule",
+      schema: {
+        args: [
+          { name: "task", required: true },
+          { name: "priority", enum: ["low", "normal", "high"] as const, defaultValue: "normal" }
+        ] as const,
+        flags: [
+          {
+            name: "delay",
+            type: "number",
+            defaultValue: 0,
+            coerce: (value) => {
+              if (!value.endsWith("m")) {
+                throw new Error('Delay must end with "m".');
+              }
+
+              return Number(value.slice(0, -1));
+            }
+          }
+        ] as const,
+        allowUnknownFlags: false
+      },
+      execute: async ({ input, reply }) => {
+        await reply(
+          `${input.args.task}:${input.args.priority}:${input.flags.delay}`
+        );
+      }
+    })
+  );
+
+  client.registerBot(bot);
+  await client.connect();
+  await transport.injectMessage(createMessage("!schedule backups"));
+  await transport.injectMessage(createMessage("!schedule backups high --delay 10m"));
+
+  assert.deepEqual(replies, [
+    { content: "backups:normal:0" },
+    { content: "backups:high:10" }
+  ]);
 });
 
 test("matches commands case-insensitively by default", async () => {
