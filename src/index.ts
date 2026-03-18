@@ -7,9 +7,12 @@ export {
 export { FluxerClient } from "./core/Client.js";
 export {
   describeCommand,
+  describeCommandGroup,
   defineCommand,
+  defineCommandGroup,
   formatCommandUsage,
   formatCommandUsageFromCommand,
+  isCommandGroup,
   parseCommandSchemaInput
 } from "./core/CommandSchema.js";
 export {
@@ -77,6 +80,7 @@ export type {
   FluxerChannel,
   FluxerClientLike,
   FluxerCommand,
+  FluxerCommandGroup,
   FluxerDebugEvent,
   FluxerDebugHandler,
   FluxerEventMap,

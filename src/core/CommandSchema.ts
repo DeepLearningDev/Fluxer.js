@@ -1,6 +1,7 @@
 import { CommandSchemaError } from "./errors.js";
 import type {
   FluxerCommand,
+  FluxerCommandGroup,
   FluxerCommandArgumentDefinition,
   FluxerCommandFlagDefinition,
   FluxerCommandSchema,
@@ -18,6 +19,14 @@ export function defineCommand<TSchema extends FluxerCommandSchema | undefined>(
   command: FluxerCommand<TSchema>
 ): FluxerCommand<TSchema> {
   return command;
+}
+
+export function defineCommandGroup(group: FluxerCommandGroup): FluxerCommandGroup {
+  return group;
+}
+
+export function isCommandGroup(value: FluxerCommand | FluxerCommandGroup): value is FluxerCommandGroup {
+  return "commands" in value;
 }
 
 export function parseCommandSchemaInput<TSchema extends FluxerCommandSchema>(
@@ -218,6 +227,42 @@ export function describeCommand(
 
   if (command.examples && command.examples.length > 0) {
     lines.push(`Examples: ${command.examples.join(" | ")}`);
+  }
+
+  return lines.join("\n");
+}
+
+export function describeCommandGroup(
+  group: Pick<FluxerCommandGroup, "name" | "description" | "usage" | "examples" | "commands">,
+  options?: { prefix?: string }
+): string {
+  const usage = group.usage
+    ? group.usage.startsWith("Usage:")
+      ? group.usage
+      : `Usage: ${group.usage}`
+    : `Usage: ${(options?.prefix ?? "")}${group.name} <subcommand>`;
+  const lines = [usage];
+
+  if (group.description) {
+    lines.push(group.description);
+  }
+
+  lines.push(
+    `Subcommands: ${group.commands
+      .map((command) => {
+        const groupedCommand = {
+          ...command,
+          name: command.name.startsWith(`${group.name} `) ? command.name : `${group.name} ${command.name}`
+        };
+        const signature = formatCommandUsageFromCommand(groupedCommand, { prefix: options?.prefix })
+          .replace(/^Usage:\s*/, "");
+        return command.description ? `${signature} - ${command.description}` : signature;
+      })
+      .join(" | ")}`
+  );
+
+  if (group.examples && group.examples.length > 0) {
+    lines.push(`Examples: ${group.examples.join(" | ")}`);
   }
 
   return lines.join("\n");

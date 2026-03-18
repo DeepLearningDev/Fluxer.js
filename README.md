@@ -35,7 +35,8 @@ import {
   createConsoleDebugHandler,
   createEssentialsPlugin,
   createPermissionGuard,
-  defineCommand
+  defineCommand,
+  defineCommandGroup
 } from "fluxer-js";
 import type { FluxerModule } from "fluxer-js";
 
@@ -84,18 +85,30 @@ const utilityModule: FluxerModule = {
         state.lastCommand = "ping";
       }
     },
-    defineCommand({
+    defineCommandGroup({
       name: "admin",
-      guards: [
-        createPermissionGuard({
-          allowUserIds: ["123"],
-          allowChannelTypes: ["text"],
-          reason: "Only operators can use this command."
+      description: "Administrative commands.",
+      commands: [
+        defineCommand({
+          name: "grant",
+          guards: [
+            createPermissionGuard({
+              allowUserIds: ["123"],
+              allowChannelTypes: ["text"],
+              reason: "Only operators can use this command."
+            })
+          ],
+          execute: async ({ reply }) => {
+            await reply("Admin access granted.");
+          }
+        }),
+        defineCommand({
+          name: "status",
+          execute: async ({ reply }) => {
+            await reply("Admin systems nominal.");
+          }
         })
-      ],
-      execute: async ({ reply }) => {
-        await reply("Admin access granted.");
-      }
+      ]
     }),
     defineCommand({
       name: "echo",
@@ -131,6 +144,8 @@ Core command behavior is intentionally strict:
 - Schema-defined args and flags are validated before execution
 - Invalid schema input replies with a usage string by default
 - `defineCommand(...)` preserves typed `input.args` and `input.flags`
+- multi-word commands resolve to the longest registered command name
+- `defineCommandGroup(...)` expands grouped subcommands without manual name prefixing
 
 Rich messages are now builder-driven:
 

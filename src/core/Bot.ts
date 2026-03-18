@@ -1,11 +1,16 @@
 import { resolveMessagePayload } from "./builders.js";
 import { parseCommandInput, tokenizeCommandInput } from "./CommandParser.js";
-import { formatCommandUsage, parseCommandSchemaInput } from "./CommandSchema.js";
+import {
+  formatCommandUsage,
+  isCommandGroup,
+  parseCommandSchemaInput
+} from "./CommandSchema.js";
 import type { FluxerClient } from "./Client.js";
 import { CommandSchemaError } from "./errors.js";
 import type {
   CommandContext,
   FluxerCommand,
+  FluxerCommandGroup,
   FluxerCommandExecutionHooks,
   FluxerCommandSchema,
   FluxerCommandGuard,
@@ -17,6 +22,7 @@ import type {
 import type { FluxerPlugin } from "./types.js";
 
 type AnyCommand = FluxerCommand<FluxerCommandSchema | undefined>;
+type AnyCommandGroup = FluxerCommandGroup;
 
 export class FluxerBot {
   readonly name: string;
@@ -26,6 +32,7 @@ export class FluxerBot {
 
   #client?: FluxerClient;
   #commands = new Map<string, AnyCommand>();
+  #commandGroups = new Map<string, AnyCommandGroup>();
   #guards: FluxerCommandGuard[] = [];
   #middleware: FluxerCommandMiddleware[] = [];
   #hookSets: FluxerCommandExecutionHooks[] = [];
@@ -57,8 +64,13 @@ export class FluxerBot {
   }
 
   public command<TSchema extends FluxerCommandSchema | undefined>(
-    command: FluxerCommand<TSchema>
+    command: FluxerCommand<TSchema> | FluxerCommandGroup
   ): this {
+    if (isCommandGroup(command)) {
+      this.#registerCommandGroup(command);
+      return this;
+    }
+
     this.#registerCommandKey(command.name, command as unknown as AnyCommand);
 
     for (const alias of command.aliases ?? []) {
@@ -185,9 +197,16 @@ export class FluxerBot {
     return this.#commands.get(this.#normalizeCommandKey(name));
   }
 
+  public resolveCommandGroup(input: string): AnyCommandGroup | undefined {
+    const tokens = tokenizeCommandInput(input.trim());
+    const match = this.#findLongestCommandGroupMatch(tokens);
+    return match?.group;
+  }
+
   public resolveCommandFromInput(input: string): AnyCommand | undefined {
-    const [commandName] = tokenizeCommandInput(input.trim());
-    return commandName ? this.getCommand(commandName) : undefined;
+    const tokens = tokenizeCommandInput(input.trim());
+    const match = this.#findLongestCommandMatch(tokens);
+    return match?.command;
   }
 
   public async handleMessage(message: FluxerMessage): Promise<void> {
@@ -199,13 +218,12 @@ export class FluxerBot {
       return;
     }
 
-    const parsedInput = parseCommandInput(message.content, this.prefix);
-    if (!parsedInput) {
+    const invocation = this.#resolveCommandInvocation(message.content);
+    if (!invocation) {
       return;
     }
 
-    const { commandName, args } = parsedInput;
-    const command = this.#commands.get(this.#normalizeCommandKey(commandName));
+    const { commandName, args, command } = invocation;
     if (!command) {
       this.#emitDebug({
         scope: "command",
@@ -446,6 +464,112 @@ export class FluxerBot {
     }
 
     this.#commands.set(normalizedKey, command);
+  }
+
+  #registerCommandGroup(group: AnyCommandGroup): void {
+    const normalizedGroupName = this.#normalizeCommandKey(group.name);
+    const existingGroup = this.#commandGroups.get(normalizedGroupName);
+    if (existingGroup && existingGroup !== group) {
+      throw new Error(`Command group "${group.name}" is already registered.`);
+    }
+
+    this.#commandGroups.set(normalizedGroupName, group);
+
+    for (const alias of group.aliases ?? []) {
+      const normalizedAlias = this.#normalizeCommandKey(alias);
+      const existingAlias = this.#commandGroups.get(normalizedAlias);
+      if (existingAlias && existingAlias !== group) {
+        throw new Error(`Command group alias "${alias}" is already registered.`);
+      }
+
+      this.#commandGroups.set(normalizedAlias, group);
+    }
+
+    for (const command of group.commands) {
+      const expandedCommand = this.#expandGroupedCommand(group, command);
+      this.command(expandedCommand);
+    }
+  }
+
+  #expandGroupedCommand(group: AnyCommandGroup, command: AnyCommand): AnyCommand {
+    const fullName = `${group.name} ${command.name}`.trim();
+    const aliases = new Set<string>();
+
+    for (const alias of command.aliases ?? []) {
+      aliases.add(`${group.name} ${alias}`.trim());
+    }
+
+    for (const groupAlias of group.aliases ?? []) {
+      aliases.add(`${groupAlias} ${command.name}`.trim());
+      for (const alias of command.aliases ?? []) {
+        aliases.add(`${groupAlias} ${alias}`.trim());
+      }
+    }
+
+    return {
+      ...command,
+      name: fullName,
+      aliases: aliases.size > 0 ? [...aliases] : undefined,
+      hidden: group.hidden || command.hidden,
+      group: group.name,
+      subcommand: command.name
+    };
+  }
+
+  #resolveCommandInvocation(
+    content: string
+  ): { commandName: string; args: string[]; command?: AnyCommand } | null {
+    const parsedInput = parseCommandInput(content, this.prefix);
+    if (!parsedInput) {
+      return null;
+    }
+
+    const body = content.slice(this.prefix.length).trim();
+    const tokens = tokenizeCommandInput(body);
+    const match = this.#findLongestCommandMatch(tokens);
+    if (!match) {
+      return parsedInput;
+    }
+
+    return {
+      commandName: match.command.name,
+      args: tokens.slice(match.tokenCount),
+      command: match.command
+    };
+  }
+
+  #findLongestCommandMatch(
+    tokens: string[]
+  ): { command: AnyCommand; tokenCount: number } | null {
+    for (let tokenCount = tokens.length; tokenCount >= 1; tokenCount -= 1) {
+      const candidateName = tokens.slice(0, tokenCount).join(" ");
+      const command = this.getCommand(candidateName);
+      if (command) {
+        return {
+          command,
+          tokenCount
+        };
+      }
+    }
+
+    return null;
+  }
+
+  #findLongestCommandGroupMatch(
+    tokens: string[]
+  ): { group: AnyCommandGroup; tokenCount: number } | null {
+    for (let tokenCount = tokens.length; tokenCount >= 1; tokenCount -= 1) {
+      const candidateName = tokens.slice(0, tokenCount).join(" ");
+      const group = this.#commandGroups.get(this.#normalizeCommandKey(candidateName));
+      if (group) {
+        return {
+          group,
+          tokenCount
+        };
+      }
+    }
+
+    return null;
   }
 
   #normalizeCommandKey(name: string): string {

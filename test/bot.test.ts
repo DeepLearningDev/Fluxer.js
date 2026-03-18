@@ -3,7 +3,11 @@ import assert from "node:assert/strict";
 import { FluxerBot } from "../src/core/Bot.js";
 import { EmbedBuilder, MessageBuilder, resolveMessagePayload } from "../src/core/builders.js";
 import { parseCommandInput } from "../src/core/CommandParser.js";
-import { defineCommand, parseCommandSchemaInput } from "../src/core/CommandSchema.js";
+import {
+  defineCommand,
+  defineCommandGroup,
+  parseCommandSchemaInput
+} from "../src/core/CommandSchema.js";
 import { FluxerClient } from "../src/core/Client.js";
 import {
   attachDebugHandler,
@@ -912,6 +916,80 @@ test("generates rich help output from command metadata", async () => {
     replies[1]?.content,
     "Usage: !echo <text...> [-u, --upper]\nEchoes text back to the current channel.\nAliases: say\nArguments: text (required, rest)\nFlags: -u, --upper (optional)\nExamples: !echo hello world | !echo --upper hello world"
   );
+});
+
+test("supports command groups and multi-word subcommands", async () => {
+  const transport = new MockTransport();
+  const client = new FluxerClient(transport);
+  const replies: Array<Omit<SendMessagePayload, "channelId">> = [];
+
+  client.sendMessage = async (_channelId, message) => {
+    if (typeof message === "string") {
+      replies.push({ content: message });
+      return;
+    }
+
+    if ("toJSON" in message && typeof message.toJSON === "function") {
+      replies.push(message.toJSON());
+      return;
+    }
+
+    replies.push(message as Omit<SendMessagePayload, "channelId">);
+  };
+
+  const bot = new FluxerBot({
+    name: "TestBot",
+    prefix: "!"
+  });
+
+  bot.module({
+    name: "admin",
+    commands: [
+      defineCommandGroup({
+        name: "admin",
+        description: "Administrative commands.",
+        examples: ["!admin ban fluxguy", "!admin audit-log"],
+        aliases: ["mod"],
+        commands: [
+          defineCommand({
+            name: "ban",
+            description: "Ban a member.",
+            schema: {
+              args: [{ name: "target", required: true }] as const
+            },
+            execute: async ({ input, reply }) => {
+              await reply(`banned:${input.args.target}`);
+            }
+          }),
+          defineCommand({
+            name: "audit-log",
+            aliases: ["logs"],
+            description: "View the audit log.",
+            execute: async ({ reply }) => {
+              await reply("audit-log");
+            }
+          })
+        ]
+      })
+    ]
+  });
+
+  bot.plugin(createEssentialsPlugin());
+
+  client.registerBot(bot);
+  await client.connect();
+  await transport.injectMessage(createMessage("!admin ban fluxguy"));
+  await transport.injectMessage(createMessage("!mod logs"));
+  await transport.injectMessage(createMessage("!help admin"));
+
+  assert.equal(replies[0]?.content, "banned:fluxguy");
+  assert.equal(replies[1]?.content, "audit-log");
+  assert.equal(
+    replies[2]?.content,
+    "Usage: !admin <subcommand>\nAdministrative commands.\nSubcommands: !admin ban <target> - Ban a member. | !admin audit-log - View the audit log.\nExamples: !admin ban fluxguy | !admin audit-log"
+  );
+  assert.equal(bot.resolveCommandFromInput("admin ban")?.name, "admin ban");
+  assert.equal(bot.resolveCommandGroup("mod")?.name, "admin");
 });
 
 test("maps member, presence, typing, and user gateway events", async () => {

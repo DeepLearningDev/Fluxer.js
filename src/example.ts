@@ -1,6 +1,6 @@
 import { FluxerBot } from "./core/Bot.js";
 import { EmbedBuilder, MessageBuilder } from "./core/builders.js";
-import { defineCommand } from "./core/CommandSchema.js";
+import { defineCommand, defineCommandGroup } from "./core/CommandSchema.js";
 import { FluxerClient } from "./core/Client.js";
 import { attachDebugHandler, createConsoleDebugHandler } from "./core/Diagnostics.js";
 import { MockTransport } from "./core/MockTransport.js";
@@ -100,22 +100,34 @@ const utilityModule: FluxerModule = {
       }
     },
     echoCommand,
-    {
+    defineCommandGroup({
       name: "admin",
-      description: "Restricted command for bot operators.",
-      usage: "!admin",
-      examples: ["!admin"],
-      guards: [
-        createPermissionGuard({
-          allowUserIds: ["user_1"],
-          allowChannelTypes: ["text"],
-          reason: "This command is restricted to approved operators in server text channels."
+      description: "Restricted operator commands.",
+      examples: ["!admin grant", "!admin status"],
+      commands: [
+        defineCommand({
+          name: "grant",
+          description: "Grant operator access.",
+          guards: [
+            createPermissionGuard({
+              allowUserIds: ["user_1"],
+              allowChannelTypes: ["text"],
+              reason: "This command is restricted to approved operators in server text channels."
+            })
+          ],
+          execute: async ({ reply }: CommandContext) => {
+            await reply("Admin command granted.");
+          }
+        }),
+        defineCommand({
+          name: "status",
+          description: "Show operator system status.",
+          execute: async ({ reply }: CommandContext) => {
+            await reply("Admin systems nominal.");
+          }
         })
-      ],
-      execute: async ({ reply }: CommandContext) => {
-        await reply("Admin command granted.");
-      }
-    }
+      ]
+    })
   ]
 };
 
@@ -180,7 +192,7 @@ await transport.injectMessage({
 
 await transport.injectMessage({
   id: "msg_4",
-  content: "!admin",
+  content: "!admin grant",
   author: {
     id: "user_1",
     username: "fluxguy"
@@ -195,6 +207,21 @@ await transport.injectMessage({
 
 await transport.injectMessage({
   id: "msg_5",
+  content: "!help admin",
+  author: {
+    id: "user_1",
+    username: "fluxguy"
+  },
+  channel: {
+    id: "general",
+    name: "general",
+    type: "text"
+  },
+  createdAt: new Date()
+});
+
+await transport.injectMessage({
+  id: "msg_6",
   content: "!about",
   author: {
     id: "user_1",

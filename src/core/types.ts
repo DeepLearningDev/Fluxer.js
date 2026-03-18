@@ -325,10 +325,22 @@ export interface FluxerCommand<
   usage?: string;
   examples?: string[];
   hidden?: boolean;
+  group?: string;
+  subcommand?: string;
   schema?: TSchema;
   guards?: FluxerCommandGuard[];
   middleware?: FluxerCommandMiddleware[];
   execute: FluxerCommandExecutor<TSchema>;
+}
+
+export interface FluxerCommandGroup {
+  name: string;
+  aliases?: string[];
+  description?: string;
+  usage?: string;
+  examples?: string[];
+  hidden?: boolean;
+  commands: FluxerCommand[];
 }
 
 export interface FluxerBotOptions {
@@ -343,7 +355,7 @@ export interface FluxerBotOptions {
 
 export interface FluxerModule {
   name: string;
-  commands?: FluxerCommand[];
+  commands?: Array<FluxerCommand | FluxerCommandGroup>;
   guards?: FluxerCommandGuard[];
   middleware?: FluxerCommandMiddleware[];
   hooks?: FluxerCommandExecutionHooks;
@@ -580,7 +592,8 @@ export interface FluxerBotLike {
   readonly name: string;
   readonly prefix: string;
   readonly commands: FluxerCommand[];
-  command(command: FluxerCommand): this;
+  command(command: FluxerCommand | FluxerCommandGroup): this;
+  resolveCommandGroup(input: string): FluxerCommandGroup | undefined;
   resolveCommandFromInput(input: string): FluxerCommand | undefined;
   use(middleware: FluxerCommandMiddleware): this;
   guard(guard: FluxerCommandGuard): this;

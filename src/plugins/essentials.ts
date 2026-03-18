@@ -1,4 +1,9 @@
-import { defineCommand, describeCommand, formatCommandUsageFromCommand } from "../core/CommandSchema.js";
+import {
+  defineCommand,
+  describeCommand,
+  describeCommandGroup,
+  formatCommandUsageFromCommand
+} from "../core/CommandSchema.js";
 import type { FluxerPlugin } from "../core/types.js";
 
 export interface EssentialsPluginOptions {
@@ -32,6 +37,12 @@ export function createEssentialsPlugin(options: EssentialsPluginOptions = {}): F
                 : "";
 
               if (requestedCommand.length > 0) {
+                const group = bot.resolveCommandGroup(requestedCommand);
+                if (group && (options.includeHiddenCommands || !group.hidden)) {
+                  await reply(describeCommandGroup(group, { prefix: bot.prefix }));
+                  return;
+                }
+
                 const command = bot.resolveCommandFromInput(requestedCommand);
                 if (!command || (!options.includeHiddenCommands && command.hidden)) {
                   await reply(`Unknown command "${requestedCommand}".`);
