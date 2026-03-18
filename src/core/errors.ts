@@ -67,6 +67,15 @@ export class RestTransportError extends FluxerError {
   }
 }
 
+export class PayloadValidationError extends FluxerError {
+  public readonly details?: Record<string, unknown>;
+
+  public constructor(message: string, options?: { code?: string; details?: Record<string, unknown> }) {
+    super(message, options?.code ?? "PAYLOAD_VALIDATION_FAILED");
+    this.details = options?.details;
+  }
+}
+
 export class CommandSchemaError extends FluxerError {
   public readonly usage?: string;
 

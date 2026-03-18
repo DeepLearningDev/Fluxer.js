@@ -1,5 +1,5 @@
 import { FluxerBot } from "./core/Bot.js";
-import { EmbedBuilder, MessageBuilder } from "./core/builders.js";
+import { AttachmentBuilder, EmbedBuilder, MessageBuilder } from "./core/builders.js";
 import { defineCommand, defineCommandGroup } from "./core/CommandSchema.js";
 import { FluxerClient } from "./core/Client.js";
 import { attachDebugHandler, createConsoleDebugHandler } from "./core/Diagnostics.js";
@@ -138,8 +138,24 @@ const utilityModule: FluxerModule = {
               new EmbedBuilder()
                 .setTitle("Heartbeat")
                 .setDescription("StarterBot is online.")
+                .setAttachmentThumbnail("status.png")
                 .addField({ name: "Command", value: "ping", inline: true })
                 .setColor(0x2f855a)
+            )
+            .addAttachment(
+              new AttachmentBuilder()
+                .setFilename("status.png")
+                .setContentType("image/png")
+                .setData(
+                  new Uint8Array([
+                    0x89, 0x50, 0x4e, 0x47
+                  ])
+                )
+            )
+            .addAttachment(
+              new AttachmentBuilder()
+                .setFilename("status.txt")
+                .setText("StarterBot heartbeat: ok")
             )
         );
         state.lastCommand = "ping";

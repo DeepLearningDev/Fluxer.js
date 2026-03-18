@@ -207,7 +207,8 @@ export class FluxerClient extends EventEmitter {
       data: {
         channelId,
         hasContent: typeof payload.content === "string" && payload.content.length > 0,
-        embedCount: payload.embeds?.length ?? 0
+        embedCount: payload.embeds?.length ?? 0,
+        attachmentCount: payload.attachments?.length ?? 0
       }
     });
 

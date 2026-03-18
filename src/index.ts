@@ -1,7 +1,11 @@
 export { FluxerBot } from "./core/Bot.js";
 export {
+  AttachmentBuilder,
   EmbedBuilder,
   MessageBuilder,
+  createAttachmentUrl,
+  createMessageTemplate,
+  validateMessagePayload,
   resolveMessagePayload
 } from "./core/builders.js";
 export { FluxerClient } from "./core/Client.js";
@@ -51,6 +55,7 @@ export {
   FluxerError,
   GatewayProtocolError,
   GatewayTransportError,
+  PayloadValidationError,
   RestTransportError,
   WaitForTimeoutError
 } from "./core/errors.js";
@@ -80,6 +85,8 @@ export { createEssentialsPlugin } from "./plugins/essentials.js";
 export type {
   CommandContext,
   FluxerAuth,
+  FluxerAttachment,
+  FluxerAttachmentData,
   FluxerBotLike,
   FluxerBotOptions,
   FluxerCommandArgumentDescriptor,

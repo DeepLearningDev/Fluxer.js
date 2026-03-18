@@ -1,7 +1,9 @@
 import { createBotAuthHeader, fetchInstanceDiscoveryDocument, normalizeBaseUrl } from "./Discovery.js";
+import { validateMessagePayload } from "./builders.js";
 import { RestTransportError } from "./errors.js";
 import { BaseTransport } from "./Transport.js";
 import type {
+  FluxerAttachment,
   FluxerInstanceDiscoveryDocument,
   FluxerRestTransportOptions,
   SendMessagePayload
@@ -40,49 +42,12 @@ export class RestTransport extends BaseTransport {
   public async sendMessage(payload: SendMessagePayload): Promise<void> {
     const baseUrl = await this.#ensureBaseUrl();
     const requestUrl = `${baseUrl}/v1${this.#sendMessagePath(payload.channelId)}`;
-    const requestBody = JSON.stringify({
-      content: payload.content,
-      embeds: payload.embeds?.map((embed) => ({
-        ...embed,
-        footer: embed.footer
-          ? {
-              text: embed.footer.text,
-              icon_url: embed.footer.iconUrl
-            }
-          : undefined,
-        author: embed.author
-          ? {
-              name: embed.author.name,
-              url: embed.author.url,
-              icon_url: embed.author.iconUrl
-            }
-          : undefined,
-        image: embed.image
-          ? {
-              url: embed.image.url
-            }
-          : undefined,
-        thumbnail: embed.thumbnail
-          ? {
-              url: embed.thumbnail.url
-            }
-          : undefined,
-        fields: embed.fields?.map((field) => ({
-          name: field.name,
-          value: field.value,
-          inline: field.inline
-        }))
-      })),
-      nonce: payload.nonce,
-      message_reference: payload.messageReference
-        ? {
-            message_id: payload.messageReference.messageId,
-            channel_id: payload.messageReference.channelId,
-            guild_id: payload.messageReference.guildId,
-            type: payload.messageReference.type
-          }
-        : undefined
-    });
+    validateMessagePayload(payload);
+    const serializedPayload = serializeMessagePayload(payload);
+    const hasAttachments = (payload.attachments?.length ?? 0) > 0;
+    const requestBody = hasAttachments
+      ? createMultipartRequestBody(payload, serializedPayload)
+      : JSON.stringify(serializedPayload);
 
     let response: Response;
     try {
@@ -90,13 +55,12 @@ export class RestTransport extends BaseTransport {
         requestUrl,
         {
           method: "POST",
-          headers: {
-            accept: "application/json",
-            "content-type": "application/json",
-            ...(this.#userAgent ? { "user-agent": this.#userAgent } : {}),
-            ...this.#headers,
-            ...this.#createAuthHeader()
-          },
+          headers: createRequestHeaders({
+            headers: this.#headers,
+            authHeader: this.#createAuthHeader(),
+            userAgent: this.#userAgent,
+            hasAttachments
+          }),
           body: requestBody
         }
       );
@@ -188,4 +152,126 @@ async function safeReadResponseText(response: Response): Promise<string | undefi
   } catch {
     return undefined;
   }
+}
+
+function serializeMessagePayload(payload: SendMessagePayload): Record<string, unknown> {
+  return {
+    content: payload.content,
+    embeds: payload.embeds?.map((embed) => ({
+      ...embed,
+      footer: embed.footer
+        ? {
+            text: embed.footer.text,
+            icon_url: embed.footer.iconUrl
+          }
+        : undefined,
+      author: embed.author
+        ? {
+            name: embed.author.name,
+            url: embed.author.url,
+            icon_url: embed.author.iconUrl
+          }
+        : undefined,
+      image: embed.image
+        ? {
+            url: embed.image.url
+          }
+        : undefined,
+      thumbnail: embed.thumbnail
+        ? {
+            url: embed.thumbnail.url
+          }
+        : undefined,
+      fields: embed.fields?.map((field) => ({
+        name: field.name,
+        value: field.value,
+        inline: field.inline
+      }))
+    })),
+    attachments: payload.attachments?.map((attachment, index) => ({
+      id: index,
+      filename: attachment.spoiler ? toSpoilerFilename(attachment.filename) : attachment.filename,
+      description: attachment.description
+    })),
+    nonce: payload.nonce,
+    message_reference: payload.messageReference
+      ? {
+          message_id: payload.messageReference.messageId,
+          channel_id: payload.messageReference.channelId,
+          guild_id: payload.messageReference.guildId,
+          type: payload.messageReference.type
+        }
+      : undefined
+  };
+}
+
+function createMultipartRequestBody(
+  payload: SendMessagePayload,
+  serializedPayload: Record<string, unknown>
+): FormData {
+  const formData = new FormData();
+  formData.set("payload_json", JSON.stringify(serializedPayload));
+
+  for (const [index, attachment] of (payload.attachments ?? []).entries()) {
+    formData.set(`files[${index}]`, toAttachmentBlob(attachment), toSpoilerFilenameIfNeeded(attachment));
+  }
+
+  return formData;
+}
+
+function toAttachmentBlob(attachment: FluxerAttachment): Blob {
+  if (attachment.data instanceof Blob) {
+    if (!attachment.contentType || attachment.data.type === attachment.contentType) {
+      return attachment.data;
+    }
+
+    return new Blob([attachment.data], { type: attachment.contentType });
+  }
+
+  if (attachment.data instanceof Uint8Array) {
+    return new Blob([new Uint8Array(attachment.data)], {
+      type: attachment.contentType
+    });
+  }
+
+  if (attachment.data instanceof ArrayBuffer) {
+    return new Blob([attachment.data.slice(0)], {
+      type: attachment.contentType
+    });
+  }
+
+  return new Blob([attachment.data], {
+    type: attachment.contentType
+  });
+}
+
+function toSpoilerFilenameIfNeeded(attachment: FluxerAttachment): string {
+  return attachment.spoiler ? toSpoilerFilename(attachment.filename) : attachment.filename;
+}
+
+function toSpoilerFilename(filename: string): string {
+  return filename.startsWith("SPOILER_") ? filename : `SPOILER_${filename}`;
+}
+
+function createRequestHeaders(options: {
+  headers: Record<string, string>;
+  authHeader: Record<string, string>;
+  userAgent?: string;
+  hasAttachments: boolean;
+}): Record<string, string> {
+  const headers: Record<string, string> = {
+    accept: "application/json",
+    ...(options.userAgent ? { "user-agent": options.userAgent } : {}),
+    ...options.headers,
+    ...options.authHeader
+  };
+
+  if (options.hasAttachments) {
+    delete headers["content-type"];
+    delete headers["Content-Type"];
+  } else {
+    headers["content-type"] = headers["content-type"] ?? headers["Content-Type"] ?? "application/json";
+  }
+
+  return headers;
 }

@@ -37,7 +37,10 @@ export class MockTransport extends BaseTransport {
     const timestamp = new Date().toISOString();
     const content = payload.content ?? "[rich message]";
     const embedSuffix = payload.embeds?.length ? ` (+${payload.embeds.length} embed(s))` : "";
-    console.log(`[Fluxer:${timestamp}] -> ${payload.channelId}: ${content}${embedSuffix}`);
+    const attachmentSuffix = payload.attachments?.length
+      ? ` (+${payload.attachments.length} attachment(s))`
+      : "";
+    console.log(`[Fluxer:${timestamp}] -> ${payload.channelId}: ${content}${embedSuffix}${attachmentSuffix}`);
   }
 
   public async injectMessage(message: FluxerMessage): Promise<void> {

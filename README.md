@@ -27,6 +27,7 @@ npm test
 
 ```ts
 import {
+  AttachmentBuilder,
   EmbedBuilder,
   FluxerBot,
   FluxerClient,
@@ -80,6 +81,13 @@ const utilityModule: FluxerModule = {
               new EmbedBuilder()
                 .setTitle("Heartbeat")
                 .setDescription("Bot is online.")
+                .setAttachmentThumbnail("status.png")
+            )
+            .addAttachment(
+              new AttachmentBuilder()
+                .setFilename("status.png")
+                .setContentType("image/png")
+                .setData(new Uint8Array([0x89, 0x50, 0x4e, 0x47]))
             )
         );
         state.lastCommand = "ping";
@@ -177,6 +185,9 @@ Rich messages are now builder-driven:
 
 - `MessageBuilder` composes outbound payloads
 - `EmbedBuilder` handles typed embed construction
+- `AttachmentBuilder` composes file attachments and supports `attachment://filename` embed references
+- `createMessageTemplate(...)` lets bots reuse validated payload templates
+- `validateMessagePayload(...)` enforces safe defaults before the transport sends malformed payloads
 - `client.sendMessage(...)` and `context.reply(...)` accept either strings or rich payloads
 
 Plugins now sit above modules:
@@ -358,7 +369,7 @@ Current state is the SDK foundation layer:
 - Middleware, guard, and hook execution now exist as first-class bot framework features
 - Modules and declarative permission policies now exist as first-class composition tools
 - Build output and command parsing are now deterministic and test-backed
-- Rich message composition is typed and transport-aware
+- Rich message composition now covers embeds, attachments, templates, and transport-aware validation
 - Gateway dispatches and higher-level plugins now have first-class entry points
 - Gateway normalization now covers messages, channels, guilds, moderation, invites, members, presence, typing, roles, reactions, and voice
 - Gateway runtime now exposes state/session transitions, typed protocol errors, and structured debug hooks
@@ -370,11 +381,11 @@ Current state is the SDK foundation layer:
 This is still not a production framework. The biggest missing pieces are:
 
 - More gateway event payload normalization across the remaining Fluxer surface
-- Rich message payload builders for embeds and attachments
+- Dedicated attachment lifecycle APIs beyond message-send serialization
 - Plugin packaging, richer permissions, and more advanced command routing
 - Packaging and versioned API guarantees
 
 ## Next steps
 
-- Expand gateway event coverage and richer message builders
+- Expand gateway event coverage and attachment/payload lifecycle APIs
 - Add release packaging and API versioning workflow

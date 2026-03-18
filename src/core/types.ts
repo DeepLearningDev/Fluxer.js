@@ -114,6 +114,16 @@ export interface MessageBuilderLike {
   toJSON(): Omit<SendMessagePayload, "channelId">;
 }
 
+export type FluxerAttachmentData = Blob | ArrayBuffer | Uint8Array | string;
+
+export interface FluxerAttachment {
+  filename: string;
+  data: FluxerAttachmentData;
+  description?: string;
+  contentType?: string;
+  spoiler?: boolean;
+}
+
 export interface FluxerEmbedField {
   name: string;
   value: string;
@@ -152,6 +162,7 @@ export interface SendMessagePayload {
   channelId: string;
   content?: string;
   embeds?: FluxerEmbed[];
+  attachments?: FluxerAttachment[];
   nonce?: string;
   messageReference?: FluxerMessageReference;
 }
