@@ -289,6 +289,8 @@ The current normalized event contract is:
 
 If a Fluxer dispatch is not normalized yet, bot code can still consume it through `gatewayDispatch` without waiting for a new SDK release.
 
+Field-level payload docs for every currently normalized gateway event live in [docs/GatewayEventContract.md](./docs/GatewayEventContract.md).
+
 The gateway session layer currently assumes Discord-style gateway lifecycle semantics as an inference from Fluxer's quickstart guidance that the gateway is Discord-compatible. The official lifecycle page is still `TBD`, so the SDK treats these parts as adapter-safe defaults rather than a final protocol guarantee:
 
 - `HELLO` starts the heartbeat loop
