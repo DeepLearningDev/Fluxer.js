@@ -33,7 +33,7 @@ Current expectations:
 - package-root exports are the intended public surface
 - deep imports into internal files should not be treated as stable
 - release notes and the changelog should call out meaningful public changes explicitly
-- CI runs `npm run release:check` on pushes, pull requests, and release-tag verification, and also runs `npm run lint` as a separate step in the main CI workflow
+- CI runs `npm run release:check` as the authoritative verification path for pushes, pull requests, and release-tag verification
 
 Important alpha caveats:
 
@@ -41,6 +41,7 @@ Important alpha caveats:
 - Node `>=20` is required
 - the gateway session/runtime layer is implemented and tested, but parts of its lifecycle still rely on Discord-compatible assumptions because Fluxer's dedicated lifecycle docs are still incomplete
 - the REST surface is currently focused on bootstrap/discovery plus outbound message sending, not a broad full-platform resource client
+- release verification includes both a built-example smoke test and an installed-package smoke test through the published entrypoint
 - many common gateway event families are normalized, but not the entire Fluxer surface yet
 - this is not a production-ready framework yet
 

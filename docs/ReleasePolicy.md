@@ -79,14 +79,17 @@ Before publishing, the repo should pass:
 - `npm test`
 - `npm run build`
 - `npm run smoke:minimal`
+- `npm run smoke:package`
 - `npm run pack:dry-run`
 
 The package now exposes `npm run release:check` and runs it automatically through `prepublishOnly`.
 
 These checks are also enforced in GitHub Actions:
 
-- `.github/workflows/ci.yml` runs `release:check` on pushes and pull requests, and also runs `lint` as a separate workflow step
+- `.github/workflows/ci.yml` runs `release:check` on pushes and pull requests as the single authoritative verification step
 - `.github/workflows/release-verify.yml` runs the same release verification path on version tags and manual release verification runs
+
+`smoke:package` is intended to catch packaging regressions that `pack:dry-run` cannot catch by itself. It performs a real `npm pack`, installs the tarball into a temporary consumer project, imports the package through its published entrypoint, and runs a tiny bot flow through the public API.
 
 ## Changelog expectations
 
