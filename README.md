@@ -2,6 +2,14 @@
 
 TypeScript framework for building bots on Fluxer.
 
+Current release channel: `0.1.0-alpha.0`
+
+- Changelog: [CHANGELOG.md](./CHANGELOG.md)
+- Release policy: [docs/ReleasePolicy.md](./docs/ReleasePolicy.md)
+- API guarantees: [docs/ApiGuarantees.md](./docs/ApiGuarantees.md)
+- Plugin packaging conventions: [docs/PluginPackaging.md](./docs/PluginPackaging.md)
+- Migration notes: [docs/MigrationFromDiscordJS.md](./docs/MigrationFromDiscordJS.md)
+
 ## Current scope
 
 This bootstrap gives you a clean starting point for a bot SDK:
@@ -15,12 +23,24 @@ This bootstrap gives you a clean starting point for a bot SDK:
 - Precise command parsing and duplicate-safe registration
 - An example bot entrypoint for local iteration
 
+## Release posture
+
+`Fluxer.JS` is currently an alpha framework. The foundation is real and test-backed, but the package is still moving toward a stable `1.0` contract.
+
+Current expectations:
+
+- alpha releases may still refine public APIs when doing so materially improves correctness or developer ergonomics
+- package-root exports are the intended public surface
+- deep imports into internal files should not be treated as stable
+- release notes and the changelog should call out meaningful public changes explicitly
+
 ## Getting started
 
 ```bash
 npm install
 npm run dev
 npm test
+npm run release:check
 ```
 
 ## Example
@@ -229,6 +249,13 @@ console.log(payload);
 
 Detailed payload-builder docs and serializer examples live in [docs/PayloadBuilders.md](./docs/PayloadBuilders.md).
 
+## Packaging and migration docs
+
+- Release flow and version channel policy: [docs/ReleasePolicy.md](./docs/ReleasePolicy.md)
+- Public API guarantee scope: [docs/ApiGuarantees.md](./docs/ApiGuarantees.md)
+- Plugin package conventions: [docs/PluginPackaging.md](./docs/PluginPackaging.md)
+- `discord.js` migration notes: [docs/MigrationFromDiscordJS.md](./docs/MigrationFromDiscordJS.md)
+
 Plugins now sit above modules:
 
 - `plugin(...)` installs synchronous packaged features
@@ -421,10 +448,10 @@ This is still not a production framework. The biggest missing pieces are:
 
 - More gateway event payload normalization across the remaining Fluxer surface
 - Dedicated attachment lifecycle APIs beyond message-send serialization
-- Plugin packaging, richer permissions, and more advanced command routing
-- Packaging and versioned API guarantees
+- Richer permissions and more advanced command routing
+- Automated release workflow and a stable API contract progression beyond alpha
 
 ## Next steps
 
 - Expand gateway event coverage and attachment/payload lifecycle APIs
-- Add release packaging and API versioning workflow
+- Tighten release workflow automation and continue toward beta-level API stability

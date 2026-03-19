@@ -1,6 +1,6 @@
 {
   "name": "fluxer-js",
-  "version": "0.1.0",
+  "version": "0.1.0-alpha.0",
   "description": "TypeScript framework for building bots on Fluxer.",
   "type": "module",
   "exports": {
@@ -21,16 +21,32 @@
     "dev": "tsx src/example.ts",
     "start": "node dist/example.js",
     "check": "tsc --noEmit -p tsconfig.json",
-    "test": "tsx --test test/bot.test.ts"
+    "test": "tsx --test test/bot.test.ts",
+    "pack:dry-run": "npm pack --dry-run",
+    "release:check": "npm run check && npm test && npm run build && npm run pack:dry-run",
+    "prepublishOnly": "npm run release:check"
   },
   "keywords": [
     "fluxer",
     "bot",
     "framework",
-    "typescript"
+    "typescript",
+    "sdk",
+    "self-hosted"
   ],
-  "author": "",
+  "author": "DeepLearningDev",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/DeepLearningDev/Fluxer.js.git"
+  },
+  "homepage": "https://github.com/DeepLearningDev/Fluxer.js#readme",
+  "bugs": {
+    "url": "https://github.com/DeepLearningDev/Fluxer.js/issues"
+  },
+  "publishConfig": {
+    "access": "public"
+  },
   "engines": {
     "node": ">=20.0.0"
   },
