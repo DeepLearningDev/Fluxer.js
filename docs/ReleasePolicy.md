@@ -32,7 +32,8 @@ Current alpha caveats:
 - the package is ESM-only
 - Node `>=20` is required
 - the runtime is test-backed, but the Fluxer gateway lifecycle contract is still partially inferred from Discord-compatible guidance while dedicated Fluxer lifecycle docs remain incomplete
-- the REST layer is currently focused on bootstrap/discovery and outbound message sending rather than a broad full-platform client
+- the REST layer is still intentionally narrow, but it now covers bootstrap/discovery plus core channel reads and message operations: fetch channel, list messages, send, fetch, edit, and delete messages
+- real-instance bootstrap through `createFluxerPlatformTransport(...)` exposes typed `PlatformBootstrapError` failures for discovery, gateway-info, and unsupported-capability startup paths
 - REST rate limits are surfaced as typed errors with retry metadata when available, but automatic retry/backoff is not implemented yet
 
 ### Beta

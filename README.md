@@ -41,6 +41,7 @@ Important alpha caveats:
 - Node `>=20` is required
 - the gateway session/runtime layer is implemented and tested, but parts of its lifecycle still rely on Discord-compatible assumptions because Fluxer's dedicated lifecycle docs are still incomplete
 - the REST surface is still intentionally narrow, but it now covers bootstrap/discovery plus core channel reads and message operations: fetch channel, list messages, send, fetch, edit, and delete messages
+- real-instance bootstrap through `createFluxerPlatformTransport(...)` now surfaces typed `PlatformBootstrapError` failures for discovery, gateway-info, and unsupported-capability startup paths
 - release verification includes both a built-example smoke test and an installed-package smoke test through the published entrypoint
 - many common gateway event families are normalized, but not the entire Fluxer surface yet
 - this is not a production-ready framework yet
@@ -56,6 +57,7 @@ npm install fluxer-js
 The published package is ESM-only and targets Node `>=20`.
 
 If you want real Fluxer connectivity, pair `FluxerClient` with `createFluxerPlatformTransport(...)`. `new FluxerClient()` by itself uses `MockTransport`.
+Real-instance bootstrap errors from `createFluxerPlatformTransport(...)` surface through `PlatformBootstrapError`.
 
 ## Repo workflow
 
@@ -277,6 +279,8 @@ await client.connect();
 ### Real instance bootstrap
 
 Use `createFluxerPlatformTransport(...)` when you want the client to talk to a real Fluxer instance over REST plus gateway transport.
+Bootstrap failures in this path surface through `PlatformBootstrapError` with stable codes for discovery failure, gateway-info failure, and unsupported instance capabilities.
+When a debug handler is attached, this bootstrap path also emits structured transport events for instance detection, blocked bootstrap, bootstrap failures, and successful platform bootstrap completion.
 
 For synchronous modules, use `bot.module(...)`. If a module needs async setup, use `await bot.installModule(...)` so startup remains deterministic.
 
@@ -504,19 +508,27 @@ Current assumptions:
 import {
   FluxerBot,
   FluxerClient,
+  PlatformBootstrapError,
   createFluxerPlatformTransport,
 } from "fluxer-js";
 
-const transport = await createFluxerPlatformTransport({
-  instanceUrl: "https://api.fluxer.app",
-  auth: { token: process.env.FLUXER_TOKEN ?? "" },
-  intents: 513,
-  onInstanceInfo: (instance) => {
-    console.log(instance.isSelfHosted, instance.apiCodeVersion, instance.capabilities);
-  }
-});
+try {
+  const transport = await createFluxerPlatformTransport({
+    instanceUrl: "https://api.fluxer.app",
+    auth: { token: process.env.FLUXER_TOKEN ?? "" },
+    intents: 513,
+    onInstanceInfo: (instance) => {
+      console.log(instance.isSelfHosted, instance.apiCodeVersion, instance.capabilities);
+    }
+  });
 
-const client = new FluxerClient(transport);
+  const client = new FluxerClient(transport);
+} catch (error) {
+  if (error instanceof PlatformBootstrapError) {
+    console.error(error.code, error.details);
+  }
+  throw error;
+}
 ```
 
 `createFluxerPlatformTransport(...)` uses the built-in `defaultParseMessageEvent(...)` parser unless you override `parseMessageEvent` explicitly.
@@ -544,7 +556,7 @@ This is still not a production framework. The biggest missing pieces are:
 
 - More gateway event payload normalization across the remaining Fluxer surface
 - Dedicated attachment lifecycle APIs beyond message-send serialization
-- Broader REST resource coverage beyond bootstrap and outbound message sending
+- Broader REST resource coverage beyond the current bootstrap, channel-read, and core message operations
 - Stable API guarantees and release progression beyond alpha
 
 ## Next steps
