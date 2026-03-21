@@ -90,7 +90,7 @@ These checks are also enforced in GitHub Actions:
 - `.github/workflows/ci.yml` runs `release:check` on pushes and pull requests as the single authoritative verification step
 - `.github/workflows/release-verify.yml` runs the same release verification path on version tags and manual release verification runs
 
-`smoke:package` is intended to catch packaging regressions that `pack:dry-run` cannot catch by itself. It performs a real `npm pack`, installs the tarball into a temporary consumer project, imports the package through its published entrypoint, and runs a tiny bot flow through the public API.
+`smoke:package` is intended to catch packaging regressions that `pack:dry-run` cannot catch by itself. It performs a real `npm pack`, installs the tarball into a temporary consumer project, imports the package through its published entrypoint, runs a tiny bot flow through the public API, and typechecks a small TypeScript consumer against the published `.d.ts` surface.
 
 ## Changelog expectations
 

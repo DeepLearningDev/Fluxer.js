@@ -6,6 +6,7 @@ import { defaultParseDispatchEvent, createFluxerPlatformTransport } from '../src
 import { GatewayProtocolError, GatewayTransportError, PlatformBootstrapError } from '../src/core/errors.js';
 import { GatewayTransport } from '../src/core/GatewayTransport.js';
 import { MockTransport } from '../src/core/MockTransport.js';
+
 class FakeWebSocket {
   static readonly CONNECTING = 0;
   static readonly OPEN = 1;
@@ -52,6 +53,31 @@ function parseSentPayloads(socket: FakeWebSocket): Array<{ op?: number; d?: unkn
 
 function findSentPayloadByOpcode(socket: FakeWebSocket, opcode: number): { op?: number; d?: unknown } | undefined {
   return parseSentPayloads(socket).find((payload) => payload.op === opcode);
+}
+
+async function flushAsyncWork(): Promise<void> {
+  await new Promise((resolve) => setImmediate(resolve));
+}
+
+async function waitForCondition(
+  predicate: () => boolean,
+  options?: {
+    timeoutMs?: number;
+    stepMs?: number;
+    message?: string;
+  }
+): Promise<void> {
+  const timeoutMs = options?.timeoutMs ?? 250;
+  const stepMs = options?.stepMs ?? 1;
+  const startedAt = Date.now();
+
+  while (!predicate()) {
+    if (Date.now() - startedAt >= timeoutMs) {
+      assert.fail(options?.message ?? "Timed out waiting for test condition.");
+    }
+
+    await new Promise((resolve) => setTimeout(resolve, stepMs));
+  }
 }
 
 test("detects self-hosted instance capabilities from discovery", () => {
@@ -934,7 +960,7 @@ test("tracks gateway state and resumes sessions on reconnect", async () => {
   });
 
   const connectPromise = transport.connect();
-  await new Promise((resolve) => setTimeout(resolve, 0));
+  await flushAsyncWork();
   const firstSocket = sockets[0];
   firstSocket.emitOpen();
   await connectPromise;
@@ -945,7 +971,9 @@ test("tracks gateway state and resumes sessions on reconnect", async () => {
       heartbeat_interval: 1000
     }
   });
-  await new Promise((resolve) => setTimeout(resolve, 0));
+  await waitForCondition(() => findSentPayloadByOpcode(firstSocket, 2)?.op === 2, {
+    message: "Expected identify payload after HELLO."
+  });
 
   assert.equal(findSentPayloadByOpcode(firstSocket, 2)?.op, 2);
 
@@ -957,10 +985,14 @@ test("tracks gateway state and resumes sessions on reconnect", async () => {
       session_id: "session_1"
     }
   });
-  await new Promise((resolve) => setTimeout(resolve, 0));
+  await waitForCondition(() => sessions.at(-1)?.sessionId === "session_1", {
+    message: "Expected READY to update the tracked session."
+  });
 
   firstSocket.close();
-  await new Promise((resolve) => setTimeout(resolve, 10));
+  await waitForCondition(() => sockets.length >= 2, {
+    message: "Expected reconnect to create a second socket."
+  });
 
   const secondSocket = sockets[1];
   secondSocket.emitOpen();
@@ -970,7 +1002,9 @@ test("tracks gateway state and resumes sessions on reconnect", async () => {
       heartbeat_interval: 1000
     }
   });
-  await new Promise((resolve) => setTimeout(resolve, 0));
+  await waitForCondition(() => findSentPayloadByOpcode(secondSocket, 6)?.op === 6, {
+    message: "Expected resume payload on reconnect."
+  });
 
   assert.equal(findSentPayloadByOpcode(secondSocket, 6)?.op, 6);
 
@@ -980,7 +1014,12 @@ test("tracks gateway state and resumes sessions on reconnect", async () => {
     s: 2,
     d: {}
   });
-  await new Promise((resolve) => setTimeout(resolve, 0));
+  await waitForCondition(
+    () => sessions.at(-1)?.sequence === 2 && states.at(-1) === "ready",
+    {
+      message: "Expected RESUMED to update session sequence and return the transport to ready."
+    }
+  );
 
   assert.equal(states[0], "connecting");
   assert.ok(states.includes("identifying"));
@@ -1017,7 +1056,7 @@ test("emits typed protocol errors for invalid sessions", async () => {
   });
 
   const connectPromise = transport.connect();
-  await new Promise((resolve) => setTimeout(resolve, 0));
+  await flushAsyncWork();
   const socket = sockets[0];
   socket.emitOpen();
   await connectPromise;
@@ -1041,7 +1080,9 @@ test("emits typed protocol errors for invalid sessions", async () => {
     op: 9,
     d: false
   });
-  await new Promise((resolve) => setTimeout(resolve, 0));
+  await waitForCondition(() => errors.length > 0 && sessions.at(-1)?.resumable === false, {
+    message: "Expected invalid session to emit an error and clear resumability."
+  });
 
   assert.ok(errors.some((error) => error instanceof GatewayProtocolError));
   assert.ok(errors.some((error) => error instanceof GatewayTransportError));
@@ -1072,7 +1113,7 @@ test("resumes after a resumable invalid session", async () => {
   });
 
   const connectPromise = transport.connect();
-  await new Promise((resolve) => setTimeout(resolve, 0));
+  await flushAsyncWork();
   const firstSocket = sockets[0];
   firstSocket.emitOpen();
   await connectPromise;
@@ -1083,7 +1124,9 @@ test("resumes after a resumable invalid session", async () => {
       heartbeat_interval: 1000
     }
   });
-  await new Promise((resolve) => setTimeout(resolve, 0));
+  await waitForCondition(() => findSentPayloadByOpcode(firstSocket, 2)?.op === 2, {
+    message: "Expected identify payload after initial HELLO."
+  });
 
   firstSocket.emitMessage({
     op: 0,
@@ -1093,13 +1136,15 @@ test("resumes after a resumable invalid session", async () => {
       session_id: "session_1"
     }
   });
-  await new Promise((resolve) => setTimeout(resolve, 0));
+  await flushAsyncWork();
 
   firstSocket.emitMessage({
     op: 9,
     d: true
   });
-  await new Promise((resolve) => setTimeout(resolve, 10));
+  await waitForCondition(() => sockets.length >= 2, {
+    message: "Expected resumable invalid session to reconnect."
+  });
 
   const secondSocket = sockets[1];
   secondSocket.emitOpen();
@@ -1109,7 +1154,9 @@ test("resumes after a resumable invalid session", async () => {
       heartbeat_interval: 1000
     }
   });
-  await new Promise((resolve) => setTimeout(resolve, 0));
+  await waitForCondition(() => findSentPayloadByOpcode(secondSocket, 6)?.op === 6, {
+    message: "Expected resume payload after resumable invalid session."
+  });
 
   assert.equal(findSentPayloadByOpcode(secondSocket, 6)?.op, 6);
 });
@@ -1137,7 +1184,7 @@ test("re-identifies after a non-resumable invalid session", async () => {
   });
 
   const connectPromise = transport.connect();
-  await new Promise((resolve) => setTimeout(resolve, 0));
+  await flushAsyncWork();
   const firstSocket = sockets[0];
   firstSocket.emitOpen();
   await connectPromise;
@@ -1148,7 +1195,9 @@ test("re-identifies after a non-resumable invalid session", async () => {
       heartbeat_interval: 1000
     }
   });
-  await new Promise((resolve) => setTimeout(resolve, 0));
+  await waitForCondition(() => findSentPayloadByOpcode(firstSocket, 2)?.op === 2, {
+    message: "Expected identify payload after initial HELLO."
+  });
 
   firstSocket.emitMessage({
     op: 0,
@@ -1158,13 +1207,15 @@ test("re-identifies after a non-resumable invalid session", async () => {
       session_id: "session_1"
     }
   });
-  await new Promise((resolve) => setTimeout(resolve, 0));
+  await flushAsyncWork();
 
   firstSocket.emitMessage({
     op: 9,
     d: false
   });
-  await new Promise((resolve) => setTimeout(resolve, 10));
+  await waitForCondition(() => sockets.length >= 2, {
+    message: "Expected non-resumable invalid session to reconnect."
+  });
 
   const secondSocket = sockets[1];
   secondSocket.emitOpen();
@@ -1174,7 +1225,9 @@ test("re-identifies after a non-resumable invalid session", async () => {
       heartbeat_interval: 1000
     }
   });
-  await new Promise((resolve) => setTimeout(resolve, 0));
+  await waitForCondition(() => findSentPayloadByOpcode(secondSocket, 2)?.op === 2, {
+    message: "Expected identify payload after non-resumable invalid session."
+  });
 
   assert.equal(findSentPayloadByOpcode(secondSocket, 2)?.op, 2);
 });
@@ -1211,7 +1264,7 @@ test("reconnects after heartbeat timeout and resumes the session", async () => {
   });
 
   const connectPromise = transport.connect();
-  await new Promise((resolve) => setTimeout(resolve, 0));
+  await flushAsyncWork();
   const firstSocket = sockets[0];
   firstSocket.emitOpen();
   await connectPromise;
@@ -1222,7 +1275,9 @@ test("reconnects after heartbeat timeout and resumes the session", async () => {
       heartbeat_interval: 5
     }
   });
-  await new Promise((resolve) => setTimeout(resolve, 0));
+  await waitForCondition(() => findSentPayloadByOpcode(firstSocket, 2)?.op === 2, {
+    message: "Expected identify payload before heartbeat timeout path."
+  });
 
   firstSocket.emitMessage({
     op: 0,
@@ -1232,10 +1287,11 @@ test("reconnects after heartbeat timeout and resumes the session", async () => {
       session_id: "session_1"
     }
   });
-
-  for (let attempt = 0; attempt < 20 && !sockets[1]; attempt += 1) {
-    await new Promise((resolve) => setTimeout(resolve, 5));
-  }
+  await waitForCondition(() => sockets.length >= 2, {
+    timeoutMs: 500,
+    stepMs: 5,
+    message: "Expected heartbeat timeout to trigger reconnect."
+  });
 
   const secondSocket = sockets[1];
   assert.ok(secondSocket);
@@ -1246,7 +1302,9 @@ test("reconnects after heartbeat timeout and resumes the session", async () => {
       heartbeat_interval: 1000
     }
   });
-  await new Promise((resolve) => setTimeout(resolve, 0));
+  await waitForCondition(() => findSentPayloadByOpcode(secondSocket, 6)?.op === 6, {
+    message: "Expected resume payload after heartbeat-timeout reconnect."
+  });
 
   assert.equal(findSentPayloadByOpcode(secondSocket, 6)?.op, 6);
   assert.ok(errors.some((error) =>
@@ -1280,13 +1338,20 @@ test("emits typed diagnostics for invalid JSON payloads", async () => {
   });
 
   const connectPromise = transport.connect();
-  await new Promise((resolve) => setTimeout(resolve, 0));
+  await flushAsyncWork();
   const socket = sockets[0];
   socket.emitOpen();
   await connectPromise;
 
   socket.emitRawMessage("{not-json");
-  await new Promise((resolve) => setTimeout(resolve, 0));
+  await waitForCondition(() =>
+    errors.some((candidate) =>
+      candidate instanceof GatewayProtocolError
+      && candidate.code === "GATEWAY_PAYLOAD_PARSE_FAILED"
+    ), {
+      message: "Expected invalid JSON payload to emit a typed protocol error."
+    }
+  );
 
   const error = errors.find((candidate) =>
     candidate instanceof GatewayProtocolError
@@ -1322,7 +1387,7 @@ test("emits typed diagnostics for malformed hello payloads", async () => {
   });
 
   const connectPromise = transport.connect();
-  await new Promise((resolve) => setTimeout(resolve, 0));
+  await flushAsyncWork();
   const socket = sockets[0];
   socket.emitOpen();
   await connectPromise;
@@ -1331,7 +1396,14 @@ test("emits typed diagnostics for malformed hello payloads", async () => {
     op: 10,
     d: {}
   });
-  await new Promise((resolve) => setTimeout(resolve, 0));
+  await waitForCondition(() =>
+    errors.some((candidate) =>
+      candidate instanceof GatewayProtocolError
+      && candidate.code === "GATEWAY_HELLO_INVALID"
+    ), {
+      message: "Expected malformed HELLO to emit a typed protocol error."
+    }
+  );
 
   const error = errors.find((candidate) =>
     candidate instanceof GatewayProtocolError
@@ -1362,7 +1434,7 @@ test("emits typed diagnostics when identify payload cannot be built", async () =
   });
 
   const connectPromise = transport.connect();
-  await new Promise((resolve) => setTimeout(resolve, 0));
+  await flushAsyncWork();
   const socket = sockets[0];
   socket.emitOpen();
   await connectPromise;
@@ -1373,7 +1445,14 @@ test("emits typed diagnostics when identify payload cannot be built", async () =
       heartbeat_interval: 1000
     }
   });
-  await new Promise((resolve) => setTimeout(resolve, 0));
+  await waitForCondition(() =>
+    errors.some((candidate) =>
+      candidate instanceof GatewayTransportError
+      && candidate.code === "GATEWAY_IDENTIFY_UNAVAILABLE"
+    ), {
+      message: "Expected missing identify payload to emit a transport error."
+    }
+  );
 
   const error = errors.find((candidate) =>
     candidate instanceof GatewayTransportError
@@ -1418,13 +1497,20 @@ test("emits typed diagnostics when reconnect attempts are exhausted", async () =
   });
 
   const connectPromise = transport.connect();
-  await new Promise((resolve) => setTimeout(resolve, 0));
+  await flushAsyncWork();
   const socket = sockets[0];
   socket.emitOpen();
   await connectPromise;
 
   socket.close();
-  await new Promise((resolve) => setTimeout(resolve, 10));
+  await waitForCondition(() =>
+    errors.some((candidate) =>
+      candidate instanceof GatewayTransportError
+      && candidate.code === "GATEWAY_RECONNECT_EXHAUSTED"
+    ), {
+      message: "Expected reconnect exhaustion to emit a transport error."
+    }
+  );
 
   const error = errors.find((candidate) =>
     candidate instanceof GatewayTransportError

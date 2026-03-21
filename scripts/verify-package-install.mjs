@@ -7,6 +7,7 @@ import { fileURLToPath } from "node:url";
 const scriptDir = path.dirname(fileURLToPath(import.meta.url));
 const repoDir = path.resolve(scriptDir, "..");
 const packageJsonPath = path.join(repoDir, "package.json");
+const typeScriptCliPath = path.join(repoDir, "node_modules", "typescript", "lib", "tsc.js");
 const packageJson = JSON.parse(await readFile(packageJsonPath, "utf8"));
 const packageName = packageJson.name;
 const processRef = globalThis.process;
@@ -105,6 +106,75 @@ try {
   );
 
   runCommand(processRef.execPath, [smokeScriptPath], {
+    cwd: consumerDir
+  });
+
+  const typeCheckConfigPath = path.join(consumerDir, "tsconfig.json");
+  await writeFile(
+    typeCheckConfigPath,
+    JSON.stringify(
+      {
+        compilerOptions: {
+          target: "ES2022",
+          module: "NodeNext",
+          moduleResolution: "NodeNext",
+          strict: true,
+          noEmit: true,
+          skipLibCheck: true
+        },
+        include: ["smoke-types.ts"]
+      },
+      null,
+      2
+    ) + "\n",
+    "utf8"
+  );
+
+  const typeSmokeScriptPath = path.join(consumerDir, "smoke-types.ts");
+  await writeFile(
+    typeSmokeScriptPath,
+    [
+      `import {`,
+      `  FluxerBot,`,
+      `  FluxerClient,`,
+      `  MockTransport,`,
+      `  PlatformBootstrapError,`,
+      `  createFluxerPlatformTransport`,
+      `} from ${JSON.stringify(packageName)};`,
+      `import type { FluxerInstanceInfo } from ${JSON.stringify(packageName)};`,
+      "",
+      "const transport = new MockTransport();",
+      "const client = new FluxerClient(transport);",
+      'const bot = new FluxerBot({ name: "TypeSmokeBot", prefix: "!" });',
+      "",
+      "bot.command({",
+      '  name: "ping",',
+      "  execute: async ({ reply }) => {",
+      '    await reply("pong");',
+      "  }",
+      "});",
+      "",
+      "client.registerBot(bot);",
+      "",
+      "const platformTransportPromise = createFluxerPlatformTransport({",
+      '  instanceUrl: "https://fluxer.example",',
+      '  auth: { token: "token" },',
+      "  onInstanceInfo: (instance: FluxerInstanceInfo) => {",
+      "    void instance.capabilities;",
+      "  }",
+      "});",
+      "",
+      "void platformTransportPromise.catch((error: unknown) => {",
+      "  if (error instanceof PlatformBootstrapError) {",
+      "    void error.code;",
+      "    void error.details;",
+      "  }",
+      "});"
+    ].join("\n"),
+    "utf8"
+  );
+
+  runCommand(processRef.execPath, [typeScriptCliPath, "--project", typeCheckConfigPath], {
     cwd: consumerDir
   });
 } finally {
