@@ -40,8 +40,7 @@ Important alpha caveats:
 - the published package is ESM-only
 - Node `>=20` is required
 - the gateway session/runtime layer is implemented and tested, but parts of its lifecycle still rely on Discord-compatible assumptions because Fluxer's dedicated lifecycle docs are still incomplete
-- the REST surface is still intentionally narrow, but it now covers bootstrap/discovery plus core channel reads and message operations: fetch channel, list messages, send, fetch, edit, and delete messages
-- the REST surface is still intentionally narrow, but it now covers bootstrap/discovery plus core channel reads and message operations: fetch channel, list messages, indicate typing, send, fetch, edit, and delete messages
+- the REST surface is still intentionally narrow, but it now covers bootstrap/discovery plus core read/write bot operations: fetch guild, fetch channel, list messages, list pinned messages, indicate typing, and send/fetch/edit/delete messages
 - real-instance bootstrap through `createFluxerPlatformTransport(...)` now surfaces typed `PlatformBootstrapError` failures for discovery, gateway-info, and unsupported-capability startup paths
 - the exported low-level discovery helpers surface typed `DiscoveryError` failures for request, HTTP, and invalid-response cases
 - release verification includes both a built-example smoke test and an installed-package smoke test through the published entrypoint
@@ -312,7 +311,9 @@ Rich messages are now builder-driven:
 - `validateMessagePayload(...)` enforces safe defaults before the transport sends malformed payloads
 - `client.sendMessage(...)` and `context.reply(...)` accept either strings or rich payloads
 - `client.listMessages(...)` exposes the current channel message listing surface with `limit`, `before`, `after`, and `around`
+- `client.fetchGuild(...)` exposes the current guild fetch surface
 - `client.fetchChannel(...)` exposes the current channel fetch surface
+- `client.listPinnedMessages(...)` exposes the current pinned-message read surface with `limit`, `before`, `items`, and `hasMore`
 - `client.indicateTyping(...)` exposes the current typing indicator surface
 - `client.fetchMessage(...)`, `client.editMessage(...)`, and `client.deleteMessage(...)` expose the current message lifecycle surface
 

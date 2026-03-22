@@ -4,10 +4,13 @@ import type {
   FluxerDebugEvent,
   EditMessagePayload,
   FluxerGatewayDispatchEvent,
+  FluxerGuild,
   FluxerGatewaySession,
   FluxerGatewayStateChangeEvent,
+  FluxerListPinnedMessagesOptions,
   FluxerListMessagesOptions,
   FluxerMessage,
+  FluxerPinnedMessageList,
   SendMessagePayload
 } from "./types.js";
 import { FluxerError } from "./errors.js";
@@ -17,7 +20,9 @@ export class MockTransport extends BaseTransport {
   #sentMessages: SendMessagePayload[] = [];
   readonly #typingChannelIds: string[] = [];
   readonly #channels = new Map<string, FluxerChannel>();
+  readonly #guilds = new Map<string, FluxerGuild>();
   readonly #messageStore = new Map<string, FluxerMessage>();
+  readonly #pinnedMessages = new Map<string, Date>();
   #nextMessageId = 1;
   readonly #sendHandlers = new Set<(payload: SendMessagePayload) => void | Promise<void>>();
 
@@ -35,6 +40,19 @@ export class MockTransport extends BaseTransport {
 
   public clearSentMessages(): void {
     this.#sentMessages = [];
+  }
+
+  public setGuild(guild: FluxerGuild): void {
+    this.#guilds.set(guild.id, { ...guild });
+  }
+
+  public pinMessage(channelId: string, messageId: string, pinnedAt: Date = new Date()): void {
+    const key = this.#messageKey(channelId, messageId);
+    if (!this.#messageStore.has(key)) {
+      throw new FluxerError("MockTransport could not find the message to pin.", "MOCK_MESSAGE_NOT_FOUND");
+    }
+
+    this.#pinnedMessages.set(key, new Date(pinnedAt));
   }
 
   public onSend(handler: (payload: SendMessagePayload) => void | Promise<void>): () => void {
@@ -87,6 +105,52 @@ export class MockTransport extends BaseTransport {
     }
 
     return { ...channel };
+  }
+
+  public async fetchGuild(guildId: string): Promise<FluxerGuild> {
+    const guild = this.#guilds.get(guildId);
+    if (!guild) {
+      throw new FluxerError("MockTransport could not find the requested guild.", "MOCK_GUILD_NOT_FOUND");
+    }
+
+    return { ...guild };
+  }
+
+  public async listPinnedMessages(
+    channelId: string,
+    options?: FluxerListPinnedMessagesOptions
+  ): Promise<FluxerPinnedMessageList> {
+    validatePinnedMessagesOptions(options);
+
+    const beforeDate = resolvePinnedMessagesBefore(options?.before);
+    const pinnedItems = [...this.#pinnedMessages.entries()]
+      .map(([key, pinnedAt]) => {
+        const separatorIndex = key.indexOf(":");
+        const entryChannelId = separatorIndex >= 0 ? key.slice(0, separatorIndex) : "";
+        const message = this.#messageStore.get(key);
+        if (!message || entryChannelId !== channelId) {
+          return null;
+        }
+
+        return {
+          message,
+          pinnedAt
+        };
+      })
+      .filter((item): item is { message: FluxerMessage; pinnedAt: Date } => item !== null)
+      .filter((item) => !beforeDate || item.pinnedAt < beforeDate)
+      .sort((left, right) => right.pinnedAt.getTime() - left.pinnedAt.getTime());
+
+    const limit = options?.limit;
+    const items = limit === undefined ? pinnedItems : pinnedItems.slice(0, limit);
+
+    return {
+      items: items.map((item) => ({
+        message: { ...item.message },
+        pinnedAt: new Date(item.pinnedAt)
+      })),
+      hasMore: limit !== undefined ? pinnedItems.length > items.length : false
+    };
   }
 
   public async listMessages(channelId: string, options?: FluxerListMessagesOptions): Promise<FluxerMessage[]> {
@@ -220,4 +284,33 @@ export class MockTransport extends BaseTransport {
   #messageKey(channelId: string, messageId: string): string {
     return `${channelId}:${messageId}`;
   }
+}
+
+function validatePinnedMessagesOptions(options?: FluxerListPinnedMessagesOptions): void {
+  if (options?.limit !== undefined && (!Number.isInteger(options.limit) || options.limit < 1 || options.limit > 50)) {
+    throw new FluxerError(
+      "MockTransport listPinnedMessages limit must be an integer between 1 and 50.",
+      "MOCK_LIST_PINNED_MESSAGES_LIMIT_INVALID"
+    );
+  }
+
+  if (options?.before !== undefined) {
+    void resolvePinnedMessagesBefore(options.before);
+  }
+}
+
+function resolvePinnedMessagesBefore(before?: string | Date): Date | undefined {
+  if (before === undefined) {
+    return undefined;
+  }
+
+  const resolvedDate = before instanceof Date ? before : new Date(before);
+  if (Number.isNaN(resolvedDate.getTime())) {
+    throw new FluxerError(
+      "MockTransport listPinnedMessages before must be a valid ISO timestamp or Date.",
+      "MOCK_LIST_PINNED_MESSAGES_BEFORE_INVALID"
+    );
+  }
+
+  return resolvedDate;
 }

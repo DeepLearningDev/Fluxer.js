@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { FluxerBot } from "../src/core/Bot.js";
+import { FluxerError, WaitForTimeoutError } from "../src/core/errors.js";
 import { FluxerTestRuntime } from "../src/testing/TestRuntime.js";
 
 test("waitForSentMessage resolves when a later sent message matches the filter", async () => {
@@ -35,13 +36,16 @@ test("waitForSentMessage times out when no sent message matches", async () => {
   const runtime = new FluxerTestRuntime();
   await runtime.connect();
 
-  await assert.rejects(
-    () =>
-      runtime.waitForSentMessage({
-        timeoutMs: 10
-      }),
-    /Timed out waiting for a sent message\./
-  );
+  await assert.rejects(() =>
+    runtime.waitForSentMessage({
+      timeoutMs: 10
+    }),
+  (error: unknown) => {
+    assert.ok(error instanceof WaitForTimeoutError);
+    assert.equal(error.code, "WAIT_FOR_TIMEOUT");
+    assert.equal(error.message, "Timed out waiting for a sent message.");
+    return true;
+  });
 });
 
 test("waitForSentMessage rejects when the wait is aborted", async () => {
@@ -55,7 +59,12 @@ test("waitForSentMessage rejects when the wait is aborted", async () => {
 
   controller.abort();
 
-  await assert.rejects(waitPromise, /Sent message wait aborted\./);
+  await assert.rejects(waitPromise, (error: unknown) => {
+    assert.ok(error instanceof FluxerError);
+    assert.equal(error.code, "TEST_RUNTIME_WAIT_ABORTED");
+    assert.equal(error.message, "Sent message wait aborted.");
+    return true;
+  });
 });
 
 test("waitForSentMessage resolves immediately from an existing sent message without new transport activity", async () => {

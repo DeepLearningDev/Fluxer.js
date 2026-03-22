@@ -1,5 +1,6 @@
 import { FluxerClient } from "../core/Client.js";
 import { MockTransport } from "../core/MockTransport.js";
+import { FluxerError, WaitForTimeoutError } from "../core/errors.js";
 import type {
   FluxerBotLike,
   FluxerGatewayDispatchEvent,
@@ -85,7 +86,7 @@ export class FluxerTestRuntime {
       };
 
       if (options.signal?.aborted) {
-        reject(new Error("Sent message wait aborted."));
+        reject(createSentMessageAbortError());
         return;
       }
 
@@ -104,7 +105,7 @@ export class FluxerTestRuntime {
             return;
           }
           cleanup();
-          reject(new Error("Timed out waiting for a sent message."));
+          reject(new WaitForTimeoutError("Timed out waiting for a sent message."));
         }, options.timeoutMs);
       }
 
@@ -114,7 +115,7 @@ export class FluxerTestRuntime {
             return;
           }
           cleanup();
-          reject(new Error("Sent message wait aborted."));
+          reject(createSentMessageAbortError());
         };
         options.signal.addEventListener("abort", onAbort, { once: true });
         removeAbortListener = () => {
@@ -168,4 +169,8 @@ export class FluxerTestRuntime {
       : eventOrType;
     await this.transport.injectGatewayDispatch(event);
   }
+}
+
+function createSentMessageAbortError(): FluxerError {
+  return new FluxerError("Sent message wait aborted.", "TEST_RUNTIME_WAIT_ABORTED");
 }

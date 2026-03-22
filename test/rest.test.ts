@@ -54,6 +54,24 @@ function createRestChannelResponse(overrides: Partial<{
   });
 }
 
+function createRestGuildResponse(overrides: Partial<{
+  id: string;
+  name: string;
+  icon: string | null;
+}> = {}): Response {
+  return new Response(JSON.stringify({
+    id: "guild_1",
+    name: "Fluxer Guild",
+    icon: "https://cdn.fluxer.local/icon.png",
+    ...overrides
+  }), {
+    status: 200,
+    headers: {
+      "content-type": "application/json"
+    }
+  });
+}
+
 function createRestMessageListResponse(): Response {
   return new Response(JSON.stringify([
     {
@@ -77,6 +95,45 @@ function createRestMessageListResponse(): Response {
       }
     }
   ]), {
+    status: 200,
+    headers: {
+      "content-type": "application/json"
+    }
+  });
+}
+
+function createRestPinnedMessageListResponse(): Response {
+  return new Response(JSON.stringify({
+    items: [
+      {
+        message: {
+          id: "msg_2",
+          content: "pinned second",
+          channel_id: "general",
+          timestamp: "2026-03-18T22:01:00.000Z",
+          author: {
+            id: "user_1",
+            username: "fluxguy"
+          }
+        },
+        pinned_at: "2026-03-18T22:10:00.000Z"
+      },
+      {
+        message: {
+          id: "msg_1",
+          content: "pinned first",
+          channel_id: "general",
+          timestamp: "2026-03-18T22:00:00.000Z",
+          author: {
+            id: "user_2",
+            username: "otherguy"
+          }
+        },
+        pinned_at: "2026-03-18T22:05:00.000Z"
+      }
+    ],
+    has_more: true
+  }), {
     status: 200,
     headers: {
       "content-type": "application/json"
@@ -349,6 +406,64 @@ test("fetches channels through rest transport and normalizes channel type", asyn
   });
 });
 
+test("fetches guilds through rest transport", async () => {
+  const requests: string[] = [];
+
+  const transport = new RestTransport({
+    baseUrl: "https://fluxer.local/api",
+    fetchImpl: async (input) => {
+      requests.push(String(input));
+      return createRestGuildResponse({
+        id: "guild_42",
+        name: "Fluxer HQ"
+      });
+    }
+  });
+
+  const guild = await transport.fetchGuild("guild_42");
+
+  assert.equal(requests[0], "https://fluxer.local/api/v1/guilds/guild_42");
+  assert.deepEqual(guild, {
+    id: "guild_42",
+    name: "Fluxer HQ",
+    iconUrl: "https://cdn.fluxer.local/icon.png"
+  });
+});
+
+test("lists pinned messages through rest transport with pagination query params", async () => {
+  const requests: string[] = [];
+
+  const transport = new RestTransport({
+    baseUrl: "https://fluxer.local/api",
+    fetchImpl: async (input) => {
+      requests.push(String(input));
+      return createRestPinnedMessageListResponse();
+    }
+  });
+
+  const pinnedMessages = await transport.listPinnedMessages("general", {
+    limit: 2,
+    before: new Date("2026-03-19T00:00:00.000Z")
+  });
+
+  assert.equal(
+    requests[0],
+    "https://fluxer.local/api/v1/channels/general/messages/pins?limit=2&before=2026-03-19T00%3A00%3A00.000Z"
+  );
+  assert.equal(pinnedMessages.hasMore, true);
+  assert.deepEqual(
+    pinnedMessages.items.map((item) => ({
+      id: item.message.id,
+      content: item.message.content,
+      pinnedAt: item.pinnedAt.toISOString()
+    })),
+    [
+      { id: "msg_2", content: "pinned second", pinnedAt: "2026-03-18T22:10:00.000Z" },
+      { id: "msg_1", content: "pinned first", pinnedAt: "2026-03-18T22:05:00.000Z" }
+    ]
+  );
+});
+
 test("indicates typing activity through rest transport", async () => {
   const requests: Array<{ method?: string; url: string }> = [];
 
@@ -410,6 +525,52 @@ test("client fetches channels through mock transport", async () => {
     name: "general",
     type: "text"
   });
+});
+
+test("client fetches guilds through mock transport", async () => {
+  const transport = new MockTransport();
+  const client = new FluxerClient(transport);
+
+  transport.setGuild({
+    id: "guild_1",
+    name: "Fluxer Guild",
+    iconUrl: "https://cdn.fluxer.local/icon.png"
+  });
+
+  await client.connect();
+
+  assert.deepEqual(await client.fetchGuild("guild_1"), {
+    id: "guild_1",
+    name: "Fluxer Guild",
+    iconUrl: "https://cdn.fluxer.local/icon.png"
+  });
+});
+
+test("client lists pinned messages through mock transport", async () => {
+  const transport = new MockTransport();
+  const client = new FluxerClient(transport);
+
+  await client.connect();
+  await client.sendMessage("general", "first");
+  await client.sendMessage("general", "second");
+  transport.pinMessage("general", "mock_msg_1", new Date("2026-03-18T22:05:00.000Z"));
+  transport.pinMessage("general", "mock_msg_2", new Date("2026-03-18T22:10:00.000Z"));
+
+  const pinnedMessages = await client.listPinnedMessages("general", {
+    limit: 1
+  });
+
+  assert.equal(pinnedMessages.hasMore, true);
+  assert.deepEqual(
+    pinnedMessages.items.map((item) => ({
+      id: item.message.id,
+      content: item.message.content,
+      pinnedAt: item.pinnedAt.toISOString()
+    })),
+    [
+      { id: "mock_msg_2", content: "second", pinnedAt: "2026-03-18T22:10:00.000Z" }
+    ]
+  );
 });
 
 test("client indicates typing through mock transport", async () => {
@@ -481,6 +642,21 @@ test("rejects invalid listMessages limits", async () => {
 
   await assert.rejects(async () => {
     await transport.listMessages("general", { limit: 0 });
+  }, (error: unknown) => {
+    assert.ok(error instanceof RestTransportError);
+    assert.equal(error.code, "REST_CONFIGURATION_INVALID");
+    assert.equal(error.details?.limit, 0);
+    return true;
+  });
+});
+
+test("rejects invalid listPinnedMessages limits", async () => {
+  const transport = new RestTransport({
+    baseUrl: "https://fluxer.local/api"
+  });
+
+  await assert.rejects(async () => {
+    await transport.listPinnedMessages("general", { limit: 0 });
   }, (error: unknown) => {
     assert.ok(error instanceof RestTransportError);
     assert.equal(error.code, "REST_CONFIGURATION_INVALID");

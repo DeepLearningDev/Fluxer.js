@@ -13,10 +13,12 @@ import type {
   FluxerGuild,
   FluxerGuildMember,
   FluxerInvite,
+  FluxerListPinnedMessagesOptions,
   FluxerListMessagesOptions,
   FluxerMessage,
   FluxerMessageAwaitOptions,
   FluxerMessageCollectorOptions,
+  FluxerPinnedMessageList,
   FluxerPresence,
   FluxerReactionEvent,
   FluxerRole,
@@ -302,6 +304,86 @@ export class FluxerClient extends EventEmitter {
       this.emitDebug({
         scope: "client",
         event: "fetch_channel_failed",
+        level: "error",
+        data: {
+          channelId,
+          message: normalizedError.message
+        }
+      });
+      throw normalizedError;
+    }
+  }
+
+  public async fetchGuild(guildId: string): Promise<FluxerGuild> {
+    this.emitDebug({
+      scope: "client",
+      event: "fetch_guild_started",
+      level: "debug",
+      data: {
+        guildId
+      }
+    });
+
+    try {
+      const guild = await this.#transport.fetchGuild(guildId);
+      this.emitDebug({
+        scope: "client",
+        event: "fetch_guild_succeeded",
+        level: "debug",
+        data: {
+          guildId,
+          name: guild.name
+        }
+      });
+      return guild;
+    } catch (error) {
+      const normalizedError = error instanceof Error ? error : new Error("Fetch guild failed.");
+      this.emitDebug({
+        scope: "client",
+        event: "fetch_guild_failed",
+        level: "error",
+        data: {
+          guildId,
+          message: normalizedError.message
+        }
+      });
+      throw normalizedError;
+    }
+  }
+
+  public async listPinnedMessages(
+    channelId: string,
+    options?: FluxerListPinnedMessagesOptions
+  ): Promise<FluxerPinnedMessageList> {
+    this.emitDebug({
+      scope: "client",
+      event: "list_pinned_messages_started",
+      level: "debug",
+      data: {
+        channelId,
+        limit: options?.limit,
+        before: options?.before instanceof Date ? options.before.toISOString() : options?.before
+      }
+    });
+
+    try {
+      const pinnedMessages = await this.#transport.listPinnedMessages(channelId, options);
+      this.emitDebug({
+        scope: "client",
+        event: "list_pinned_messages_succeeded",
+        level: "debug",
+        data: {
+          channelId,
+          count: pinnedMessages.items.length,
+          hasMore: pinnedMessages.hasMore
+        }
+      });
+      return pinnedMessages;
+    } catch (error) {
+      const normalizedError = error instanceof Error ? error : new Error("List pinned messages failed.");
+      this.emitDebug({
+        scope: "client",
+        event: "list_pinned_messages_failed",
         level: "error",
         data: {
           channelId,

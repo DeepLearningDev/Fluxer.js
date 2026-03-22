@@ -26,6 +26,21 @@ export interface FluxerListMessagesOptions {
   around?: string;
 }
 
+export interface FluxerListPinnedMessagesOptions {
+  limit?: number;
+  before?: string | Date;
+}
+
+export interface FluxerPinnedMessage {
+  message: FluxerMessage;
+  pinnedAt: Date;
+}
+
+export interface FluxerPinnedMessageList {
+  items: FluxerPinnedMessage[];
+  hasMore: boolean;
+}
+
 export interface FluxerGuild {
   id: string;
   name: string;
@@ -567,6 +582,11 @@ export interface FluxerTransport {
   sendMessage(payload: SendMessagePayload): Promise<void>;
   indicateTyping(channelId: string): Promise<void>;
   fetchChannel(channelId: string): Promise<FluxerChannel>;
+  fetchGuild(guildId: string): Promise<FluxerGuild>;
+  listPinnedMessages(
+    channelId: string,
+    options?: FluxerListPinnedMessagesOptions
+  ): Promise<FluxerPinnedMessageList>;
   listMessages(channelId: string, options?: FluxerListMessagesOptions): Promise<FluxerMessage[]>;
   fetchMessage(channelId: string, messageId: string): Promise<FluxerMessage>;
   editMessage(channelId: string, messageId: string, payload: EditMessagePayload): Promise<FluxerMessage>;
@@ -755,6 +775,11 @@ export interface FluxerClientLike {
   sendMessage(channelId: string, message: FluxerMessageInput): Promise<void>;
   indicateTyping?(channelId: string): Promise<void>;
   fetchChannel?(channelId: string): Promise<FluxerChannel>;
+  fetchGuild?(guildId: string): Promise<FluxerGuild>;
+  listPinnedMessages?(
+    channelId: string,
+    options?: FluxerListPinnedMessagesOptions
+  ): Promise<FluxerPinnedMessageList>;
   listMessages?(channelId: string, options?: FluxerListMessagesOptions): Promise<FluxerMessage[]>;
   fetchMessage?(channelId: string, messageId: string): Promise<FluxerMessage>;
   editMessage?(channelId: string, messageId: string, message: FluxerMessageInput): Promise<FluxerMessage>;

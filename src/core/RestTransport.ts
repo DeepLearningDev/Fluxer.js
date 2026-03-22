@@ -6,9 +6,12 @@ import type {
   EditMessagePayload,
   FluxerAttachment,
   FluxerChannel,
+  FluxerGuild,
+  FluxerListPinnedMessagesOptions,
   FluxerInstanceDiscoveryDocument,
   FluxerListMessagesOptions,
   FluxerMessage,
+  FluxerPinnedMessageList,
   FluxerRestTransportOptions,
   FluxerSerializedMessagePayload,
   SendMessagePayload
@@ -153,6 +156,88 @@ export class RestTransport extends BaseTransport {
     }
 
     return parseRestChannel(await parseJsonResponse(response), {
+      method: "GET",
+      url: requestUrl,
+      channelId
+    });
+  }
+
+  public async fetchGuild(guildId: string): Promise<FluxerGuild> {
+    const baseUrl = await this.#ensureBaseUrl();
+    const requestUrl = `${baseUrl}/v1/guilds/${guildId}`;
+
+    let response: Response;
+    try {
+      response = await this.#fetchImpl(requestUrl, {
+        method: "GET",
+        headers: createRequestHeaders({
+          headers: this.#headers,
+          authHeader: this.#createAuthHeader(),
+          userAgent: this.#userAgent,
+          hasAttachments: false
+        })
+      });
+    } catch (error) {
+      throw createRequestFailedError({
+        method: "GET",
+        url: requestUrl,
+        guildId,
+        error
+      });
+    }
+
+    if (!response.ok) {
+      throw await createResponseError(response, {
+        method: "GET",
+        url: requestUrl,
+        guildId
+      });
+    }
+
+    return parseRestGuild(await parseJsonResponse(response), {
+      method: "GET",
+      url: requestUrl,
+      guildId
+    });
+  }
+
+  public async listPinnedMessages(
+    channelId: string,
+    options?: FluxerListPinnedMessagesOptions
+  ): Promise<FluxerPinnedMessageList> {
+    validateListPinnedMessagesOptions(options);
+    const baseUrl = await this.#ensureBaseUrl();
+    const requestUrl = createPinnedMessagesUrl(baseUrl, channelId, options);
+
+    let response: Response;
+    try {
+      response = await this.#fetchImpl(requestUrl, {
+        method: "GET",
+        headers: createRequestHeaders({
+          headers: this.#headers,
+          authHeader: this.#createAuthHeader(),
+          userAgent: this.#userAgent,
+          hasAttachments: false
+        })
+      });
+    } catch (error) {
+      throw createRequestFailedError({
+        method: "GET",
+        url: requestUrl,
+        channelId,
+        error
+      });
+    }
+
+    if (!response.ok) {
+      throw await createResponseError(response, {
+        method: "GET",
+        url: requestUrl,
+        channelId
+      });
+    }
+
+    return parseRestPinnedMessageList(await parseJsonResponse(response), {
       method: "GET",
       url: requestUrl,
       channelId
@@ -484,6 +569,97 @@ function parseRestChannel(
   };
 }
 
+function parseRestGuild(
+  payload: unknown,
+  context: {
+    method: string;
+    url: string;
+    guildId: string;
+  }
+): FluxerGuild {
+  const guild = payload as {
+    id?: string;
+    name?: string;
+    icon?: string | null;
+  };
+
+  if (!guild?.id || !guild.name) {
+    throw new RestTransportError({
+      message: "RestTransport received a guild response with missing required fields.",
+      code: "REST_RESPONSE_INVALID",
+      retryable: false,
+      details: {
+        ...context,
+        payload
+      }
+    });
+  }
+
+  return {
+    id: guild.id,
+    name: guild.name,
+    iconUrl: guild.icon ?? undefined
+  };
+}
+
+function parseRestPinnedMessageList(
+  payload: unknown,
+  context: {
+    method: string;
+    url: string;
+    channelId: string;
+  }
+): FluxerPinnedMessageList {
+  const responsePayload = payload as {
+    items?: Array<{
+      message?: unknown;
+      pinned_at?: string;
+    }>;
+    has_more?: boolean;
+  };
+
+  if (!Array.isArray(responsePayload?.items) || typeof responsePayload.has_more !== "boolean") {
+    throw new RestTransportError({
+      message: "RestTransport received a pinned message list response with an invalid shape.",
+      code: "REST_RESPONSE_INVALID",
+      retryable: false,
+      details: {
+        ...context,
+        payload
+      }
+    });
+  }
+
+  return {
+    items: responsePayload.items.map((item, index) => {
+      const pinnedAt = new Date(item.pinned_at ?? "");
+      if (Number.isNaN(pinnedAt.getTime())) {
+        throw new RestTransportError({
+          message: "RestTransport received a pinned message entry with an invalid pin timestamp.",
+          code: "REST_RESPONSE_INVALID",
+          retryable: false,
+          details: {
+            ...context,
+            index,
+            payload: item
+          }
+        });
+      }
+
+      return {
+        message: parseRestMessage(item.message, {
+          ...context,
+          messageId: typeof (item.message as { id?: unknown } | undefined)?.id === "string"
+            ? (item.message as { id: string }).id
+            : `index:${index}`
+        }),
+        pinnedAt
+      };
+    }),
+    hasMore: responsePayload.has_more
+  };
+}
+
 function parseRestMessageList(
   payload: unknown,
   context: {
@@ -531,6 +707,22 @@ function createMessageListUrl(baseUrl: string, channelId: string, options?: Flux
   return url.toString();
 }
 
+function createPinnedMessagesUrl(
+  baseUrl: string,
+  channelId: string,
+  options?: FluxerListPinnedMessagesOptions
+): string {
+  const url = new URL(`${baseUrl}/v1/channels/${channelId}/messages/pins`);
+  if (options?.limit !== undefined) {
+    url.searchParams.set("limit", String(options.limit));
+  }
+  if (options?.before !== undefined) {
+    const before = options.before instanceof Date ? options.before.toISOString() : options.before;
+    url.searchParams.set("before", before);
+  }
+  return url.toString();
+}
+
 function normalizeChannelType(type: number | string): FluxerChannel["type"] {
   if (type === "dm" || type === 1) {
     return "dm";
@@ -560,10 +752,38 @@ function validateListMessagesOptions(options?: FluxerListMessagesOptions): void 
   }
 }
 
+function validateListPinnedMessagesOptions(options?: FluxerListPinnedMessagesOptions): void {
+  if (options?.limit !== undefined && (!Number.isInteger(options.limit) || options.limit < 1 || options.limit > 50)) {
+    throw new RestTransportError({
+      message: "RestTransport listPinnedMessages limit must be an integer between 1 and 50.",
+      code: "REST_CONFIGURATION_INVALID",
+      retryable: false,
+      details: {
+        limit: options.limit
+      }
+    });
+  }
+
+  if (options?.before !== undefined) {
+    const before = options.before instanceof Date ? options.before : new Date(options.before);
+    if (Number.isNaN(before.getTime())) {
+      throw new RestTransportError({
+        message: "RestTransport listPinnedMessages before must be a valid ISO timestamp or Date.",
+        code: "REST_CONFIGURATION_INVALID",
+        retryable: false,
+        details: {
+          before: options.before instanceof Date ? options.before.toISOString() : options.before
+        }
+      });
+    }
+  }
+}
+
 function createRequestFailedError(context: {
   method: string;
   url: string;
   channelId?: string;
+  guildId?: string;
   messageId?: string;
   error: unknown;
 }): RestTransportError {
@@ -575,6 +795,7 @@ function createRequestFailedError(context: {
       method: context.method,
       url: context.url,
       channelId: context.channelId,
+      guildId: context.guildId,
       messageId: context.messageId,
       message: context.error instanceof Error ? context.error.message : String(context.error)
     }
@@ -587,6 +808,7 @@ async function createResponseError(
     method: string;
     url: string;
     channelId?: string;
+    guildId?: string;
     messageId?: string;
   }
 ): Promise<RestTransportError> {
@@ -603,6 +825,7 @@ async function createResponseError(
         method: context.method,
         url: context.url,
         channelId: context.channelId,
+        guildId: context.guildId,
         messageId: context.messageId,
         statusText: response.statusText,
         responseBody,
@@ -623,6 +846,7 @@ async function createResponseError(
       method: context.method,
       url: context.url,
       channelId: context.channelId,
+      guildId: context.guildId,
       messageId: context.messageId,
       statusText: response.statusText,
       responseBody

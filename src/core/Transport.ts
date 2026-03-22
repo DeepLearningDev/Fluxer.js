@@ -6,9 +6,12 @@ import type {
   FluxerGatewaySessionHandler,
   FluxerGatewayStateHandler,
   FluxerChannel,
+  FluxerGuild,
+  FluxerListPinnedMessagesOptions,
   FluxerListMessagesOptions,
   FluxerMessage,
   FluxerMessageHandler,
+  FluxerPinnedMessageList,
   FluxerTransport,
   SendMessagePayload
 } from "./types.js";
@@ -93,6 +96,26 @@ export abstract class BaseTransport implements FluxerTransport {
     throw new FluxerError(
       "This transport does not support fetching channels.",
       "TRANSPORT_FETCH_CHANNEL_UNSUPPORTED"
+    );
+  }
+
+  public async fetchGuild(guildId: string): Promise<FluxerGuild> {
+    void guildId;
+    throw new FluxerError(
+      "This transport does not support fetching guilds.",
+      "TRANSPORT_FETCH_GUILD_UNSUPPORTED"
+    );
+  }
+
+  public async listPinnedMessages(
+    channelId: string,
+    options?: FluxerListPinnedMessagesOptions
+  ): Promise<FluxerPinnedMessageList> {
+    void channelId;
+    void options;
+    throw new FluxerError(
+      "This transport does not support listing pinned messages.",
+      "TRANSPORT_LIST_PINNED_MESSAGES_UNSUPPORTED"
     );
   }
 
