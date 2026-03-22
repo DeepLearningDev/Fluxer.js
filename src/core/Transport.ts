@@ -93,6 +93,14 @@ export abstract class BaseTransport implements FluxerTransport {
     );
   }
 
+  public async fetchUser(userId: string): Promise<FluxerUser> {
+    void userId;
+    throw new FluxerError(
+      "This transport does not support fetching users.",
+      "TRANSPORT_FETCH_USER_UNSUPPORTED"
+    );
+  }
+
   public async indicateTyping(channelId: string): Promise<void> {
     void channelId;
     throw new FluxerError(
@@ -114,6 +122,14 @@ export abstract class BaseTransport implements FluxerTransport {
     throw new FluxerError(
       "This transport does not support fetching guilds.",
       "TRANSPORT_FETCH_GUILD_UNSUPPORTED"
+    );
+  }
+
+  public async listGuildChannels(guildId: string): Promise<FluxerChannel[]> {
+    void guildId;
+    throw new FluxerError(
+      "This transport does not support listing guild channels.",
+      "TRANSPORT_LIST_GUILD_CHANNELS_UNSUPPORTED"
     );
   }
 

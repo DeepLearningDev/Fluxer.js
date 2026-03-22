@@ -581,9 +581,11 @@ export interface FluxerTransport {
   disconnect(): Promise<void>;
   sendMessage(payload: SendMessagePayload): Promise<void>;
   fetchCurrentUser(): Promise<FluxerUser>;
+  fetchUser(userId: string): Promise<FluxerUser>;
   indicateTyping(channelId: string): Promise<void>;
   fetchChannel(channelId: string): Promise<FluxerChannel>;
   fetchGuild(guildId: string): Promise<FluxerGuild>;
+  listGuildChannels(guildId: string): Promise<FluxerChannel[]>;
   fetchGuildMember(guildId: string, userId: string): Promise<FluxerGuildMember>;
   listGuildRoles(guildId: string): Promise<FluxerRole[]>;
   listPinnedMessages(
@@ -777,9 +779,11 @@ export interface FluxerClientLike {
   waitForMessage?(options?: FluxerMessageAwaitOptions): Promise<FluxerMessage>;
   sendMessage(channelId: string, message: FluxerMessageInput): Promise<void>;
   fetchCurrentUser?(): Promise<FluxerUser>;
+  fetchUser?(userId: string): Promise<FluxerUser>;
   indicateTyping?(channelId: string): Promise<void>;
   fetchChannel?(channelId: string): Promise<FluxerChannel>;
   fetchGuild?(guildId: string): Promise<FluxerGuild>;
+  listGuildChannels?(guildId: string): Promise<FluxerChannel[]>;
   fetchGuildMember?(guildId: string, userId: string): Promise<FluxerGuildMember>;
   listGuildRoles?(guildId: string): Promise<FluxerRole[]>;
   listPinnedMessages?(

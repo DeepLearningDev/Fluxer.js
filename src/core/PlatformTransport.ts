@@ -82,6 +82,10 @@ export class PlatformTransport extends BaseTransport {
     return this.#outbound.fetchCurrentUser();
   }
 
+  public async fetchUser(userId: string): Promise<FluxerUser> {
+    return this.#outbound.fetchUser(userId);
+  }
+
   public async indicateTyping(channelId: string): Promise<void> {
     await this.#outbound.indicateTyping(channelId);
   }
@@ -92,6 +96,10 @@ export class PlatformTransport extends BaseTransport {
 
   public async fetchGuild(guildId: string): Promise<FluxerGuild> {
     return this.#outbound.fetchGuild(guildId);
+  }
+
+  public async listGuildChannels(guildId: string): Promise<FluxerChannel[]> {
+    return this.#outbound.listGuildChannels(guildId);
   }
 
   public async fetchGuildMember(guildId: string, userId: string): Promise<FluxerGuildMember> {

@@ -275,6 +275,43 @@ export class FluxerClient extends EventEmitter {
     }
   }
 
+  public async fetchUser(userId: string): Promise<FluxerUser> {
+    this.emitDebug({
+      scope: "client",
+      event: "fetch_user_started",
+      level: "debug",
+      data: {
+        userId
+      }
+    });
+
+    try {
+      const user = await this.#transport.fetchUser(userId);
+      this.emitDebug({
+        scope: "client",
+        event: "fetch_user_succeeded",
+        level: "debug",
+        data: {
+          userId: user.id,
+          isBot: user.isBot ?? false
+        }
+      });
+      return user;
+    } catch (error) {
+      const normalizedError = error instanceof Error ? error : new Error("Fetch user failed.");
+      this.emitDebug({
+        scope: "client",
+        event: "fetch_user_failed",
+        level: "error",
+        data: {
+          userId,
+          message: normalizedError.message
+        }
+      });
+      throw normalizedError;
+    }
+  }
+
   public async indicateTyping(channelId: string): Promise<void> {
     this.emitDebug({
       scope: "client",
@@ -374,6 +411,43 @@ export class FluxerClient extends EventEmitter {
       this.emitDebug({
         scope: "client",
         event: "fetch_guild_failed",
+        level: "error",
+        data: {
+          guildId,
+          message: normalizedError.message
+        }
+      });
+      throw normalizedError;
+    }
+  }
+
+  public async listGuildChannels(guildId: string): Promise<FluxerChannel[]> {
+    this.emitDebug({
+      scope: "client",
+      event: "list_guild_channels_started",
+      level: "debug",
+      data: {
+        guildId
+      }
+    });
+
+    try {
+      const channels = await this.#transport.listGuildChannels(guildId);
+      this.emitDebug({
+        scope: "client",
+        event: "list_guild_channels_succeeded",
+        level: "debug",
+        data: {
+          guildId,
+          count: channels.length
+        }
+      });
+      return channels;
+    } catch (error) {
+      const normalizedError = error instanceof Error ? error : new Error("List guild channels failed.");
+      this.emitDebug({
+        scope: "client",
+        event: "list_guild_channels_failed",
         level: "error",
         data: {
           guildId,

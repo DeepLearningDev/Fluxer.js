@@ -74,6 +74,26 @@ function createRestCurrentUserResponse(overrides: Partial<{
   });
 }
 
+function createRestUserResponse(overrides: Partial<{
+  id: string;
+  username: string;
+  global_name: string | null;
+  bot: boolean;
+}> = {}): Response {
+  return new Response(JSON.stringify({
+    id: "user_42",
+    username: "fluxfriend",
+    global_name: "Flux Friend",
+    bot: false,
+    ...overrides
+  }), {
+    status: 200,
+    headers: {
+      "content-type": "application/json"
+    }
+  });
+}
+
 function createRestGuildResponse(overrides: Partial<{
   id: string;
   name: string;
@@ -85,6 +105,26 @@ function createRestGuildResponse(overrides: Partial<{
     icon: "https://cdn.fluxer.local/icon.png",
     ...overrides
   }), {
+    status: 200,
+    headers: {
+      "content-type": "application/json"
+    }
+  });
+}
+
+function createRestGuildChannelListResponse(): Response {
+  return new Response(JSON.stringify([
+    {
+      id: "general",
+      name: "general",
+      type: 0
+    },
+    {
+      id: "mods",
+      name: "mods",
+      type: 0
+    }
+  ]), {
     status: 200,
     headers: {
       "content-type": "application/json"
@@ -501,6 +541,28 @@ test("fetches the current user through rest transport", async () => {
   });
 });
 
+test("fetches users by id through rest transport", async () => {
+  const requests: string[] = [];
+
+  const transport = new RestTransport({
+    baseUrl: "https://fluxer.local/api",
+    fetchImpl: async (input) => {
+      requests.push(String(input));
+      return createRestUserResponse();
+    }
+  });
+
+  const user = await transport.fetchUser("user_42");
+
+  assert.equal(requests[0], "https://fluxer.local/api/v1/users/user_42");
+  assert.deepEqual(user, {
+    id: "user_42",
+    username: "fluxfriend",
+    displayName: "Flux Friend",
+    isBot: false
+  });
+});
+
 test("fetches guilds through rest transport", async () => {
   const requests: string[] = [];
 
@@ -523,6 +585,34 @@ test("fetches guilds through rest transport", async () => {
     name: "Fluxer HQ",
     iconUrl: "https://cdn.fluxer.local/icon.png"
   });
+});
+
+test("lists guild channels through rest transport", async () => {
+  const requests: string[] = [];
+
+  const transport = new RestTransport({
+    baseUrl: "https://fluxer.local/api",
+    fetchImpl: async (input) => {
+      requests.push(String(input));
+      return createRestGuildChannelListResponse();
+    }
+  });
+
+  const channels = await transport.listGuildChannels("guild_42");
+
+  assert.equal(requests[0], "https://fluxer.local/api/v1/guilds/guild_42/channels");
+  assert.deepEqual(channels, [
+    {
+      id: "general",
+      name: "general",
+      type: "text"
+    },
+    {
+      id: "mods",
+      name: "mods",
+      type: "text"
+    }
+  ]);
 });
 
 test("fetches guild members through rest transport", async () => {
@@ -731,6 +821,39 @@ test("client fetches guilds through mock transport", async () => {
   });
 });
 
+test("client lists guild channels through mock transport", async () => {
+  const transport = new MockTransport();
+  const client = new FluxerClient(transport);
+
+  transport.setGuildChannels("guild_1", [
+    {
+      id: "general",
+      name: "general",
+      type: "text"
+    },
+    {
+      id: "mods",
+      name: "mods",
+      type: "text"
+    }
+  ]);
+
+  await client.connect();
+
+  assert.deepEqual(await client.listGuildChannels("guild_1"), [
+    {
+      id: "general",
+      name: "general",
+      type: "text"
+    },
+    {
+      id: "mods",
+      name: "mods",
+      type: "text"
+    }
+  ]);
+});
+
 test("client fetches the current user through mock transport", async () => {
   const transport = new MockTransport();
   const client = new FluxerClient(transport);
@@ -749,6 +872,27 @@ test("client fetches the current user through mock transport", async () => {
     username: "fluxhelper",
     displayName: "Flux Helper",
     isBot: true
+  });
+});
+
+test("client fetches users by id through mock transport", async () => {
+  const transport = new MockTransport();
+  const client = new FluxerClient(transport);
+
+  transport.setUser({
+    id: "user_42",
+    username: "fluxfriend",
+    displayName: "Flux Friend",
+    isBot: false
+  });
+
+  await client.connect();
+
+  assert.deepEqual(await client.fetchUser("user_42"), {
+    id: "user_42",
+    username: "fluxfriend",
+    displayName: "Flux Friend",
+    isBot: false
   });
 });
 

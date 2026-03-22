@@ -129,6 +129,45 @@ export class RestTransport extends BaseTransport {
     });
   }
 
+  public async fetchUser(userId: string): Promise<FluxerUser> {
+    const baseUrl = await this.#ensureBaseUrl();
+    const requestUrl = `${baseUrl}/v1/users/${userId}`;
+
+    let response: Response;
+    try {
+      response = await this.#fetchImpl(requestUrl, {
+        method: "GET",
+        headers: createRequestHeaders({
+          headers: this.#headers,
+          authHeader: this.#createAuthHeader(),
+          userAgent: this.#userAgent,
+          hasAttachments: false
+        })
+      });
+    } catch (error) {
+      throw createRequestFailedError({
+        method: "GET",
+        url: requestUrl,
+        userId,
+        error
+      });
+    }
+
+    if (!response.ok) {
+      throw await createResponseError(response, {
+        method: "GET",
+        url: requestUrl,
+        userId
+      });
+    }
+
+    return parseRestUser(await parseJsonResponse(response), {
+      method: "GET",
+      url: requestUrl,
+      userId
+    });
+  }
+
   public async indicateTyping(channelId: string): Promise<void> {
     const baseUrl = await this.#ensureBaseUrl();
     const requestUrl = `${baseUrl}/v1/channels/${channelId}/typing`;
@@ -234,6 +273,45 @@ export class RestTransport extends BaseTransport {
     }
 
     return parseRestGuild(await parseJsonResponse(response), {
+      method: "GET",
+      url: requestUrl,
+      guildId
+    });
+  }
+
+  public async listGuildChannels(guildId: string): Promise<FluxerChannel[]> {
+    const baseUrl = await this.#ensureBaseUrl();
+    const requestUrl = `${baseUrl}/v1/guilds/${guildId}/channels`;
+
+    let response: Response;
+    try {
+      response = await this.#fetchImpl(requestUrl, {
+        method: "GET",
+        headers: createRequestHeaders({
+          headers: this.#headers,
+          authHeader: this.#createAuthHeader(),
+          userAgent: this.#userAgent,
+          hasAttachments: false
+        })
+      });
+    } catch (error) {
+      throw createRequestFailedError({
+        method: "GET",
+        url: requestUrl,
+        guildId,
+        error
+      });
+    }
+
+    if (!response.ok) {
+      throw await createResponseError(response, {
+        method: "GET",
+        url: requestUrl,
+        guildId
+      });
+    }
+
+    return parseRestChannelList(await parseJsonResponse(response), {
       method: "GET",
       url: requestUrl,
       guildId
@@ -661,6 +739,7 @@ function parseRestUser(
   context: {
     method: string;
     url: string;
+    userId?: string;
   }
 ): FluxerUser {
   const user = payload as {
@@ -721,6 +800,37 @@ function parseRestChannel(
     name: channel.name ?? channel.id,
     type: normalizeChannelType(channel.type)
   };
+}
+
+function parseRestChannelList(
+  payload: unknown,
+  context: {
+    method: string;
+    url: string;
+    guildId: string;
+  }
+): FluxerChannel[] {
+  if (!Array.isArray(payload)) {
+    throw new RestTransportError({
+      message: "RestTransport received a guild channel list response with an invalid shape.",
+      code: "REST_RESPONSE_INVALID",
+      retryable: false,
+      details: {
+        ...context,
+        payload
+      }
+    });
+  }
+
+  return payload.map((channel, index) =>
+    parseRestChannel(channel, {
+      method: context.method,
+      url: context.url,
+      channelId: typeof (channel as { id?: unknown }).id === "string"
+        ? (channel as { id: string }).id
+        : `index:${index}`
+    })
+  );
 }
 
 function parseRestGuild(

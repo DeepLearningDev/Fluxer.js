@@ -24,8 +24,10 @@ export class MockTransport extends BaseTransport {
   readonly #typingChannelIds: string[] = [];
   readonly #channels = new Map<string, FluxerChannel>();
   readonly #guilds = new Map<string, FluxerGuild>();
+  readonly #guildChannels = new Map<string, FluxerChannel[]>();
   readonly #guildMembers = new Map<string, FluxerGuildMember>();
   readonly #guildRoles = new Map<string, FluxerRole[]>();
+  readonly #users = new Map<string, FluxerUser>();
   #currentUser: FluxerUser = {
     id: "mock_transport",
     username: "mocktransport",
@@ -56,8 +58,20 @@ export class MockTransport extends BaseTransport {
     this.#guilds.set(guild.id, { ...guild });
   }
 
+  public setGuildChannels(guildId: string, channels: FluxerChannel[]): void {
+    this.#guildChannels.set(guildId, channels.map((channel) => ({ ...channel })));
+    for (const channel of channels) {
+      this.#channels.set(channel.id, { ...channel });
+    }
+  }
+
   public setCurrentUser(user: FluxerUser): void {
     this.#currentUser = { ...user };
+    this.#users.set(user.id, { ...user });
+  }
+
+  public setUser(user: FluxerUser): void {
+    this.#users.set(user.id, { ...user });
   }
 
   public setGuildMember(member: FluxerGuildMember): void {
@@ -118,6 +132,19 @@ export class MockTransport extends BaseTransport {
     return { ...this.#currentUser };
   }
 
+  public async fetchUser(userId: string): Promise<FluxerUser> {
+    if (this.#currentUser.id === userId) {
+      return { ...this.#currentUser };
+    }
+
+    const user = this.#users.get(userId);
+    if (!user) {
+      throw new FluxerError("MockTransport could not find the requested user.", "MOCK_USER_NOT_FOUND");
+    }
+
+    return { ...user };
+  }
+
   public async indicateTyping(channelId: string): Promise<void> {
     this.#typingChannelIds.push(channelId);
     if (!this.#channels.has(channelId)) {
@@ -145,6 +172,15 @@ export class MockTransport extends BaseTransport {
     }
 
     return { ...guild };
+  }
+
+  public async listGuildChannels(guildId: string): Promise<FluxerChannel[]> {
+    const channels = this.#guildChannels.get(guildId);
+    if (!channels) {
+      return [];
+    }
+
+    return channels.map((channel) => ({ ...channel }));
   }
 
   public async fetchGuildMember(guildId: string, userId: string): Promise<FluxerGuildMember> {
