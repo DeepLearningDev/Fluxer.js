@@ -13,6 +13,7 @@ import type {
   FluxerMessage,
   FluxerPinnedMessageList,
   FluxerRole,
+  FluxerUser,
   SendMessagePayload
 } from "./types.js";
 import { FluxerError } from "./errors.js";
@@ -25,6 +26,11 @@ export class MockTransport extends BaseTransport {
   readonly #guilds = new Map<string, FluxerGuild>();
   readonly #guildMembers = new Map<string, FluxerGuildMember>();
   readonly #guildRoles = new Map<string, FluxerRole[]>();
+  #currentUser: FluxerUser = {
+    id: "mock_transport",
+    username: "mocktransport",
+    isBot: true
+  };
   readonly #messageStore = new Map<string, FluxerMessage>();
   readonly #pinnedMessages = new Map<string, Date>();
   #nextMessageId = 1;
@@ -48,6 +54,10 @@ export class MockTransport extends BaseTransport {
 
   public setGuild(guild: FluxerGuild): void {
     this.#guilds.set(guild.id, { ...guild });
+  }
+
+  public setCurrentUser(user: FluxerUser): void {
+    this.#currentUser = { ...user };
   }
 
   public setGuildMember(member: FluxerGuildMember): void {
@@ -102,6 +112,10 @@ export class MockTransport extends BaseTransport {
       ? ` (+${payload.attachments.length} attachment(s))`
       : "";
     console.log(`[Fluxer:${timestamp}] -> ${payload.channelId}: ${content}${embedSuffix}${attachmentSuffix}`);
+  }
+
+  public async fetchCurrentUser(): Promise<FluxerUser> {
+    return { ...this.#currentUser };
   }
 
   public async indicateTyping(channelId: string): Promise<void> {
@@ -310,11 +324,7 @@ export class MockTransport extends BaseTransport {
     return {
       id: messageId,
       content: payload.content ?? "",
-      author: {
-        id: "mock_transport",
-        username: "mocktransport",
-        isBot: true
-      },
+      author: { ...this.#currentUser },
       channel: {
         id: payload.channelId,
         name: payload.channelId,

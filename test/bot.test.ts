@@ -30,6 +30,7 @@ import {
 } from '../src/core/Diagnostics.js';
 import {
   CommandSchemaError,
+  FluxerError,
   PayloadValidationError,
   WaitForTimeoutError
 } from '../src/core/errors.js';
@@ -644,6 +645,49 @@ test("times out when waiting for a message", async () => {
       }),
     WaitForTimeoutError
   );
+});
+
+test("rejects waitFor with a typed abort error", async () => {
+  const transport = new MockTransport();
+  const client = new FluxerClient(transport);
+  const controller = new AbortController();
+
+  await client.connect();
+
+  const waitPromise = client.waitFor("messageCreate", {
+    signal: controller.signal
+  });
+
+  controller.abort();
+
+  await assert.rejects(async () => {
+    await waitPromise;
+  }, (error: unknown) => {
+    assert.ok(error instanceof FluxerError);
+    assert.equal(error.code, "WAIT_FOR_ABORTED");
+    assert.equal(error.message, 'Waiting for event "messageCreate" was aborted.');
+    return true;
+  });
+});
+
+test("rejects waitForMessage immediately when the abort signal is already aborted", async () => {
+  const transport = new MockTransport();
+  const client = new FluxerClient(transport);
+  const controller = new AbortController();
+
+  await client.connect();
+  controller.abort();
+
+  await assert.rejects(async () => {
+    await client.waitForMessage({
+      signal: controller.signal
+    });
+  }, (error: unknown) => {
+    assert.ok(error instanceof FluxerError);
+    assert.equal(error.code, "WAIT_FOR_ABORTED");
+    assert.equal(error.message, 'Waiting for event "messageCreate" was aborted.');
+    return true;
+  });
 });
 
 test("collects messages until the max is reached", async () => {

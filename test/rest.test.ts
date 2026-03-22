@@ -54,6 +54,26 @@ function createRestChannelResponse(overrides: Partial<{
   });
 }
 
+function createRestCurrentUserResponse(overrides: Partial<{
+  id: string;
+  username: string;
+  global_name: string | null;
+  bot: boolean;
+}> = {}): Response {
+  return new Response(JSON.stringify({
+    id: "bot_1",
+    username: "fluxbot",
+    global_name: "Flux Bot",
+    bot: true,
+    ...overrides
+  }), {
+    status: 200,
+    headers: {
+      "content-type": "application/json"
+    }
+  });
+}
+
 function createRestGuildResponse(overrides: Partial<{
   id: string;
   name: string;
@@ -459,6 +479,28 @@ test("fetches channels through rest transport and normalizes channel type", asyn
   });
 });
 
+test("fetches the current user through rest transport", async () => {
+  const requests: string[] = [];
+
+  const transport = new RestTransport({
+    baseUrl: "https://fluxer.local/api",
+    fetchImpl: async (input) => {
+      requests.push(String(input));
+      return createRestCurrentUserResponse();
+    }
+  });
+
+  const user = await transport.fetchCurrentUser();
+
+  assert.equal(requests[0], "https://fluxer.local/api/v1/users/@me");
+  assert.deepEqual(user, {
+    id: "bot_1",
+    username: "fluxbot",
+    displayName: "Flux Bot",
+    isBot: true
+  });
+});
+
 test("fetches guilds through rest transport", async () => {
   const requests: string[] = [];
 
@@ -686,6 +728,27 @@ test("client fetches guilds through mock transport", async () => {
     id: "guild_1",
     name: "Fluxer Guild",
     iconUrl: "https://cdn.fluxer.local/icon.png"
+  });
+});
+
+test("client fetches the current user through mock transport", async () => {
+  const transport = new MockTransport();
+  const client = new FluxerClient(transport);
+
+  transport.setCurrentUser({
+    id: "bot_9",
+    username: "fluxhelper",
+    displayName: "Flux Helper",
+    isBot: true
+  });
+
+  await client.connect();
+
+  assert.deepEqual(await client.fetchCurrentUser(), {
+    id: "bot_9",
+    username: "fluxhelper",
+    displayName: "Flux Helper",
+    isBot: true
   });
 });
 

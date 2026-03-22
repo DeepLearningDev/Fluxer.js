@@ -1,6 +1,6 @@
 import { EventEmitter } from "node:events";
 import type { FluxerClient } from "./Client.js";
-import { WaitForTimeoutError } from "./errors.js";
+import { FluxerError, WaitForTimeoutError } from "./errors.js";
 import type {
   FluxerCollectorStopReason,
   FluxerEventMap,
@@ -175,13 +175,13 @@ export async function waitForEvent<E extends EventKey>(
     if (options.signal) {
       if (options.signal.aborted) {
         cleanup();
-        reject(new Error(`Waiting for event "${String(eventName)}" was aborted.`));
+        reject(createWaitForAbortError(eventName));
         return;
       }
 
       options.signal.addEventListener("abort", () => {
         cleanup();
-        reject(new Error(`Waiting for event "${String(eventName)}" was aborted.`));
+        reject(createWaitForAbortError(eventName));
       }, { once: true });
     }
   });
@@ -218,4 +218,11 @@ async function matchesMessageAwaitOptions(
   }
 
   return true;
+}
+
+function createWaitForAbortError(eventName: EventKey): FluxerError {
+  return new FluxerError(
+    `Waiting for event "${String(eventName)}" was aborted.`,
+    "WAIT_FOR_ABORTED"
+  );
 }

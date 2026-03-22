@@ -16,6 +16,7 @@ import type {
   FluxerRole,
   FluxerRestTransportOptions,
   FluxerSerializedMessagePayload,
+  FluxerUser,
   SendMessagePayload
 } from "./types.js";
 
@@ -90,6 +91,42 @@ export class RestTransport extends BaseTransport {
         channelId: payload.channelId
       });
     }
+  }
+
+  public async fetchCurrentUser(): Promise<FluxerUser> {
+    const baseUrl = await this.#ensureBaseUrl();
+    const requestUrl = `${baseUrl}/v1/users/@me`;
+
+    let response: Response;
+    try {
+      response = await this.#fetchImpl(requestUrl, {
+        method: "GET",
+        headers: createRequestHeaders({
+          headers: this.#headers,
+          authHeader: this.#createAuthHeader(),
+          userAgent: this.#userAgent,
+          hasAttachments: false
+        })
+      });
+    } catch (error) {
+      throw createRequestFailedError({
+        method: "GET",
+        url: requestUrl,
+        error
+      });
+    }
+
+    if (!response.ok) {
+      throw await createResponseError(response, {
+        method: "GET",
+        url: requestUrl
+      });
+    }
+
+    return parseRestUser(await parseJsonResponse(response), {
+      method: "GET",
+      url: requestUrl
+    });
   }
 
   public async indicateTyping(channelId: string): Promise<void> {
@@ -616,6 +653,40 @@ function parseRestMessage(
       type: "text"
     },
     createdAt: new Date(message.timestamp ?? Date.now())
+  };
+}
+
+function parseRestUser(
+  payload: unknown,
+  context: {
+    method: string;
+    url: string;
+  }
+): FluxerUser {
+  const user = payload as {
+    id?: string;
+    username?: string;
+    global_name?: string | null;
+    bot?: boolean;
+  };
+
+  if (!user?.id || !user.username) {
+    throw new RestTransportError({
+      message: "RestTransport received a user response with missing required fields.",
+      code: "REST_RESPONSE_INVALID",
+      retryable: false,
+      details: {
+        ...context,
+        payload
+      }
+    });
+  }
+
+  return {
+    id: user.id,
+    username: user.username,
+    displayName: user.global_name ?? undefined,
+    isBot: user.bot
   };
 }
 

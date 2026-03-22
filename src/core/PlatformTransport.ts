@@ -15,6 +15,7 @@ import type {
   FluxerPinnedMessageList,
   FluxerRole,
   FluxerTransport,
+  FluxerUser,
   SendMessagePayload
 } from "./types.js";
 
@@ -75,6 +76,10 @@ export class PlatformTransport extends BaseTransport {
 
   public async sendMessage(payload: SendMessagePayload): Promise<void> {
     await this.#outbound.sendMessage(payload);
+  }
+
+  public async fetchCurrentUser(): Promise<FluxerUser> {
+    return this.#outbound.fetchCurrentUser();
   }
 
   public async indicateTyping(channelId: string): Promise<void> {

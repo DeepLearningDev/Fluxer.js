@@ -242,6 +242,39 @@ export class FluxerClient extends EventEmitter {
     }
   }
 
+  public async fetchCurrentUser(): Promise<FluxerUser> {
+    this.emitDebug({
+      scope: "client",
+      event: "fetch_current_user_started",
+      level: "debug"
+    });
+
+    try {
+      const user = await this.#transport.fetchCurrentUser();
+      this.emitDebug({
+        scope: "client",
+        event: "fetch_current_user_succeeded",
+        level: "debug",
+        data: {
+          userId: user.id,
+          isBot: user.isBot ?? false
+        }
+      });
+      return user;
+    } catch (error) {
+      const normalizedError = error instanceof Error ? error : new Error("Fetch current user failed.");
+      this.emitDebug({
+        scope: "client",
+        event: "fetch_current_user_failed",
+        level: "error",
+        data: {
+          message: normalizedError.message
+        }
+      });
+      throw normalizedError;
+    }
+  }
+
   public async indicateTyping(channelId: string): Promise<void> {
     this.emitDebug({
       scope: "client",

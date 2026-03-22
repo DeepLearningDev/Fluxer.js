@@ -15,6 +15,7 @@ import type {
   FluxerPinnedMessageList,
   FluxerRole,
   FluxerTransport,
+  FluxerUser,
   SendMessagePayload
 } from "./types.js";
 import { FluxerError } from "./errors.js";
@@ -84,6 +85,13 @@ export abstract class BaseTransport implements FluxerTransport {
   public abstract connect(): Promise<void>;
   public abstract disconnect(): Promise<void>;
   public abstract sendMessage(payload: SendMessagePayload): Promise<void>;
+
+  public async fetchCurrentUser(): Promise<FluxerUser> {
+    throw new FluxerError(
+      "This transport does not support fetching the current user.",
+      "TRANSPORT_FETCH_CURRENT_USER_UNSUPPORTED"
+    );
+  }
 
   public async indicateTyping(channelId: string): Promise<void> {
     void channelId;
