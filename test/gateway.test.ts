@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { FluxerClient } from '../src/core/Client.js';
 import { createInstanceInfo, detectInstanceCapabilities } from '../src/core/Instance.js';
-import { defaultParseDispatchEvent, createFluxerPlatformTransport } from '../src/core/createPlatformTransport.js';
+import { createFluxerPlatformTransport, defaultParseDispatchEvent, defaultParseMessageEvent } from '../src/core/createPlatformTransport.js';
 import { GatewayProtocolError, GatewayTransportError, PlatformBootstrapError } from '../src/core/errors.js';
 import { GatewayTransport } from '../src/core/GatewayTransport.js';
 import { MockTransport } from '../src/core/MockTransport.js';
@@ -549,6 +549,201 @@ test("parses raw gateway dispatch envelopes", () => {
 
   assert.equal(event?.type, "GUILD_DELETE");
   assert.equal(event?.sequence, 10);
+});
+
+test("parses valid MESSAGE_CREATE payloads through the default parser", () => {
+  const message = defaultParseMessageEvent({
+    op: 0,
+    t: "MESSAGE_CREATE",
+    s: 15,
+    d: {
+      id: "msg_1",
+      content: "hello",
+      author: {
+        id: "user_1",
+        username: "fluxguy",
+        global_name: "Flux Guy",
+        bot: false
+      },
+      channel_id: "general",
+      timestamp: "2026-03-18T22:00:00.000Z"
+    }
+  });
+
+  assert.deepEqual(message, {
+    id: "msg_1",
+    content: "hello",
+    author: {
+      id: "user_1",
+      username: "fluxguy",
+      displayName: "Flux Guy",
+      isBot: false
+    },
+    channel: {
+      id: "general",
+      name: "general",
+      type: "text"
+    },
+    createdAt: new Date("2026-03-18T22:00:00.000Z")
+  });
+});
+
+test("rejects malformed MESSAGE_CREATE payloads through the default parser", () => {
+  assert.throws(() => {
+    defaultParseMessageEvent({
+      op: 0,
+      t: "MESSAGE_CREATE",
+      s: 16,
+      d: {
+        id: "msg_1",
+        author: {
+          id: "user_1",
+          username: "fluxguy"
+        },
+        channel_id: "general",
+        timestamp: "not-a-date"
+      }
+    });
+  }, (error: unknown) => {
+    assert.ok(error instanceof GatewayProtocolError);
+    assert.equal(error.code, "GATEWAY_MESSAGE_CREATE_INVALID");
+    assert.equal(error.eventType, "MESSAGE_CREATE");
+    assert.equal(error.retryable, false);
+    return true;
+  });
+});
+
+test("emits message events through GatewayTransport when using the default parser", async () => {
+  const sockets: FakeWebSocket[] = [];
+  const transport = new GatewayTransport({
+    url: "wss://gateway.fluxer.test",
+    auth: { token: "bot-token" },
+    webSocketFactory: () => {
+      const socket = new FakeWebSocket();
+      sockets.push(socket);
+      return socket as unknown as WebSocket;
+    },
+    buildIdentifyPayload: ({ auth }) => ({
+      op: 2,
+      d: { token: auth?.token }
+    }),
+    parseMessageEvent: defaultParseMessageEvent
+  });
+
+  const messages: string[] = [];
+  transport.onMessage((message) => {
+    messages.push(`${message.id}:${message.content}`);
+  });
+
+  const connectPromise = transport.connect();
+  await flushAsyncWork();
+  const socket = sockets[0];
+  socket.emitOpen();
+  await connectPromise;
+
+  socket.emitMessage({
+    op: 10,
+    d: {
+      heartbeat_interval: 1000
+    }
+  });
+  await waitForCondition(() => findSentPayloadByOpcode(socket, 2)?.op === 2, {
+    message: "Expected identify payload before message ingress test."
+  });
+
+  socket.emitMessage({
+    op: 0,
+    t: "MESSAGE_CREATE",
+    s: 17,
+    d: {
+      id: "msg_7",
+      content: "pong",
+      author: {
+        id: "user_7",
+        username: "fluxfriend"
+      },
+      channel_id: "general",
+      timestamp: "2026-03-18T22:00:00.000Z"
+    }
+  });
+
+  await waitForCondition(() => messages.length === 1, {
+    message: "Expected default parser to emit a message event."
+  });
+
+  assert.deepEqual(messages, ["msg_7:pong"]);
+});
+
+test("emits typed protocol errors for malformed MESSAGE_CREATE payloads in GatewayTransport", async () => {
+  const sockets: FakeWebSocket[] = [];
+  const transport = new GatewayTransport({
+    url: "wss://gateway.fluxer.test",
+    auth: { token: "bot-token" },
+    webSocketFactory: () => {
+      const socket = new FakeWebSocket();
+      sockets.push(socket);
+      return socket as unknown as WebSocket;
+    },
+    buildIdentifyPayload: ({ auth }) => ({
+      op: 2,
+      d: { token: auth?.token }
+    }),
+    parseMessageEvent: defaultParseMessageEvent
+  });
+
+  const errors: Error[] = [];
+  transport.onError((error) => {
+    errors.push(error);
+  });
+
+  const connectPromise = transport.connect();
+  await flushAsyncWork();
+  const socket = sockets[0];
+  socket.emitOpen();
+  await connectPromise;
+
+  socket.emitMessage({
+    op: 10,
+    d: {
+      heartbeat_interval: 1000
+    }
+  });
+  await waitForCondition(() => findSentPayloadByOpcode(socket, 2)?.op === 2, {
+    message: "Expected identify payload before malformed message ingress test."
+  });
+
+  socket.emitMessage({
+    op: 0,
+    t: "MESSAGE_CREATE",
+    s: 18,
+    d: {
+      id: "msg_8",
+      author: {
+        id: "user_8",
+        username: "fluxfriend"
+      },
+      channel_id: "general",
+      timestamp: "not-a-date"
+    }
+  });
+
+  await waitForCondition(() =>
+    errors.some((candidate) =>
+      candidate instanceof GatewayProtocolError
+      && candidate.code === "GATEWAY_MESSAGE_CREATE_INVALID"
+    ), {
+      message: "Expected malformed MESSAGE_CREATE payload to emit a typed protocol error."
+    }
+  );
+
+  const error = errors.find((candidate) =>
+    candidate instanceof GatewayProtocolError
+    && candidate.code === "GATEWAY_MESSAGE_CREATE_INVALID"
+  );
+
+  assert.ok(error instanceof GatewayProtocolError);
+  assert.equal(error.eventType, "MESSAGE_CREATE");
+  assert.equal(error.retryable, false);
 });
 
 test("maps member, presence, typing, and user gateway events", async () => {
@@ -1521,5 +1716,6 @@ test("emits typed diagnostics when reconnect attempts are exhausted", async () =
   assert.equal(error.retryable, false);
   assert.equal(error.details?.maxAttempts, 0);
 });
+
 
 

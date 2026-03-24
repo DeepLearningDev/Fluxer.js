@@ -350,6 +350,31 @@ Typical fix:
 
 - inspect the server or gateway proxy for malformed frames
 
+### `GATEWAY_MESSAGE_CREATE_INVALID`
+
+Type: `GatewayProtocolError`
+
+Meaning:
+
+- a `MESSAGE_CREATE` payload reached the default message parser but was missing required fields or contained an invalid timestamp
+
+Retryable:
+
+- `false`
+
+Details:
+
+```ts
+{
+  payload: unknown;
+}
+```
+
+Typical fix:
+
+- inspect the inbound event shape from the Fluxer instance or proxy
+- verify the payload still matches the documented message-create contract before it reaches bot code
+
 ### `GATEWAY_HELLO_INVALID`
 
 Type: `GatewayProtocolError`
@@ -425,3 +450,4 @@ client.on("error", (error) => {
 ```
 
 If you need all low-level frames and unsupported dispatches, combine this error reference with [GatewayEventContract.md](./GatewayEventContract.md).
+

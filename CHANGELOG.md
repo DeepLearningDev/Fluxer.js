@@ -13,6 +13,11 @@ with pre-release channels while the framework is not yet stable.
 - Remaining gateway normalization across the broader Fluxer surface
 - Release-channel progression from alpha to beta once the runtime and packaging surface are more stable
 
+### Fixed
+
+- the default `MESSAGE_CREATE` parser now rejects malformed payloads with typed `GATEWAY_MESSAGE_CREATE_INVALID` diagnostics instead of constructing partially trusted message objects
+- gateway tests now exercise the default inbound message parser directly so the real ingress path is covered instead of only parser overrides
+
 ## [0.1.0-alpha.1] - 2026-03-18
 
 ### Added
@@ -52,3 +57,4 @@ with pre-release channels while the framework is not yet stable.
 
 - `0.1.0-alpha.0` is the first documented alpha snapshot of the framework foundation
 - Public APIs may still change between alpha releases when doing so materially improves correctness or ergonomics
+

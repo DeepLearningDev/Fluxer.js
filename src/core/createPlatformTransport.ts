@@ -1,5 +1,5 @@
 import { fetchGatewayInformation, fetchInstanceDiscoveryDocument } from "./Discovery.js";
-import { PlatformBootstrapError } from "./errors.js";
+import { GatewayProtocolError, PlatformBootstrapError } from "./errors.js";
 import { GatewayTransport } from "./GatewayTransport.js";
 import { createInstanceInfo } from "./Instance.js";
 import { PlatformTransport } from "./PlatformTransport.js";
@@ -263,28 +263,73 @@ export function defaultParseMessageEvent(payload: unknown): FluxerMessage | null
     return null;
   }
 
-  const payloadData = event.data as {
-    id: string;
-    content: string;
-    author: { id: string; username: string; global_name?: string; bot?: boolean };
-    channel_id: string;
-    timestamp: string;
-  };
+  if (!isRecord(event.data)) {
+    throw createInvalidMessageCreatePayloadError(event, "Message payload must be an object.", event.data);
+  }
+
+  const author = isRecord(event.data.author) ? event.data.author : undefined;
+  const content = typeof event.data.content === "string" ? event.data.content : "";
+
+  if (
+    typeof event.data.id !== "string"
+    || typeof event.data.channel_id !== "string"
+    || typeof event.data.timestamp !== "string"
+    || !author
+    || typeof author.id !== "string"
+    || typeof author.username !== "string"
+  ) {
+    throw createInvalidMessageCreatePayloadError(
+      event,
+      "Message payload is missing required fields.",
+      event.data
+    );
+  }
+
+  const createdAt = new Date(event.data.timestamp);
+  if (Number.isNaN(createdAt.getTime())) {
+    throw createInvalidMessageCreatePayloadError(
+      event,
+      "Message payload included an invalid timestamp.",
+      event.data
+    );
+  }
 
   return {
-    id: payloadData.id,
-    content: payloadData.content,
+    id: event.data.id,
+    content,
     author: {
-      id: payloadData.author.id,
-      username: payloadData.author.username,
-      displayName: payloadData.author.global_name,
-      isBot: payloadData.author.bot
+      id: author.id,
+      username: author.username,
+      displayName: typeof author.global_name === "string" ? author.global_name : undefined,
+      isBot: typeof author.bot === "boolean" ? author.bot : undefined
     },
     channel: {
-      id: payloadData.channel_id,
-      name: payloadData.channel_id,
+      id: event.data.channel_id,
+      name: event.data.channel_id,
       type: "text"
     },
-    createdAt: new Date(payloadData.timestamp)
+    createdAt
   };
 }
+
+function createInvalidMessageCreatePayloadError(
+  event: FluxerGatewayDispatchEvent,
+  message: string,
+  payload: unknown
+): GatewayProtocolError {
+  return new GatewayProtocolError({
+    message: `Gateway MESSAGE_CREATE payload is invalid. ${message}`,
+    code: "GATEWAY_MESSAGE_CREATE_INVALID",
+    retryable: false,
+    opcode: event.raw.op,
+    eventType: event.type,
+    details: {
+      payload
+    }
+  });
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null;
+}
+
