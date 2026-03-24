@@ -129,7 +129,14 @@ try {
 
 ## Docs And Guides
 
-Start here:
+Guide layer:
+
+- Wiki home: https://github.com/DeepLearningDev/Fluxer.js/wiki
+- Getting started: https://github.com/DeepLearningDev/Fluxer.js/wiki/Getting-Started
+- Core concepts: https://github.com/DeepLearningDev/Fluxer.js/wiki/Core-Concepts
+- Transport and runtime: https://github.com/DeepLearningDev/Fluxer.js/wiki/Transport-And-Runtime
+
+Reference docs:
 
 - Changelog: [CHANGELOG.md](./CHANGELOG.md)
 - Release policy: [docs/ReleasePolicy.md](./docs/ReleasePolicy.md)
@@ -138,19 +145,6 @@ Start here:
 - REST error codes: [docs/RestErrorCodes.md](./docs/RestErrorCodes.md)
 - Migration notes: [docs/MigrationFromDiscordJS.md](./docs/MigrationFromDiscordJS.md)
 - Plugin packaging conventions: [docs/PluginPackaging.md](./docs/PluginPackaging.md)
-
-Guide layer:
-
-- Wiki home draft: [wiki/Home.md](./wiki/Home.md)
-- Getting started: [wiki/Getting-Started.md](./wiki/Getting-Started.md)
-- Core concepts: [wiki/Core-Concepts.md](./wiki/Core-Concepts.md)
-- Commands and conversations: [wiki/Commands-And-Conversations.md](./wiki/Commands-And-Conversations.md)
-- Transport and runtime: [wiki/Transport-And-Runtime.md](./wiki/Transport-And-Runtime.md)
-- Messages and payloads: [wiki/Messages-And-Payloads.md](./wiki/Messages-And-Payloads.md)
-- Testing and release: [wiki/Testing-And-Release.md](./wiki/Testing-And-Release.md)
-- Migration and compatibility: [wiki/Migration-And-Compatibility.md](./wiki/Migration-And-Compatibility.md)
-
-Note: the GitHub-hosted wiki at `https://github.com/DeepLearningDev/Fluxer.js/wiki` is not available yet because the wiki repo is not currently live. These pages are staged in `./wiki/` so Liam can publish them as soon as the GitHub wiki is enabled.
 
 ## Repo Workflow
 

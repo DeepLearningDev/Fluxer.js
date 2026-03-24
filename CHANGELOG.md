@@ -16,7 +16,7 @@ with pre-release channels while the framework is not yet stable.
 ### Changed
 
 - README is now a tighter entry page with a clearer install path, docs navigation, and current-limitations framing
-- a staged `wiki/` guide layer now exists in the repo so the GitHub wiki can be populated quickly once wiki hosting is enabled
+- the GitHub wiki now hosts the guide-layer docs, and the main repo README points there instead of carrying a duplicate local wiki layer
 
 ### Fixed
 
@@ -62,4 +62,5 @@ with pre-release channels while the framework is not yet stable.
 
 - `0.1.0-alpha.0` is the first documented alpha snapshot of the framework foundation
 - Public APIs may still change between alpha releases when doing so materially improves correctness or ergonomics
+
 
