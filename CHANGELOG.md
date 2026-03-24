@@ -13,6 +13,11 @@ with pre-release channels while the framework is not yet stable.
 - Remaining gateway normalization across the broader Fluxer surface
 - Release-channel progression from alpha to beta once the runtime and packaging surface are more stable
 
+### Changed
+
+- README is now a tighter entry page with a clearer install path, docs navigation, and current-limitations framing
+- a staged `wiki/` guide layer now exists in the repo so the GitHub wiki can be populated quickly once wiki hosting is enabled
+
 ### Fixed
 
 - the default `MESSAGE_CREATE` parser now rejects malformed payloads with typed `GATEWAY_MESSAGE_CREATE_INVALID` diagnostics instead of constructing partially trusted message objects
