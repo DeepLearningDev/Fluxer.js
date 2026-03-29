@@ -10,6 +10,7 @@ import {
 import {
   optionalEnv,
   parseIntegerEnv,
+  requireWebSocketRuntime,
   requireEnv
 } from "./example-support.js";
 
@@ -97,6 +98,7 @@ async function main(): Promise<void> {
   });
   const keepAlive = process.env.FLUXER_KEEP_ALIVE === "1";
   const bootstrapChannelId = optionalEnv("FLUXER_BOOTSTRAP_CHANNEL_ID");
+  requireWebSocketRuntime("Real-instance bootstrap");
 
   const transport = await createFluxerPlatformTransport({
     instanceUrl,

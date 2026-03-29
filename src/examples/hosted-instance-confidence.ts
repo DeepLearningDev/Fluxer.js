@@ -16,6 +16,7 @@ import {
   loadExampleEnvFiles,
   optionalEnvFromNames,
   parseIntegerEnv,
+  requireWebSocketRuntime,
   requireEnv,
   sleep,
   writeReportIfConfigured as writeExampleReportIfConfigured
@@ -52,6 +53,12 @@ interface HostedConfidenceReport {
     id: string;
     name: string;
     type: string;
+  };
+  pinnedMessages?: {
+    count: number;
+    hasMore: boolean;
+    newestMessageId?: string;
+    newestPinnedAt?: string;
   };
   instance?: {
     apiBaseUrl?: string;
@@ -301,6 +308,7 @@ async function main(): Promise<void> {
   const probePrefix = optionalEnvFromNames(["FLUXER_HOSTED_MESSAGE_PREFIX", "FLUXER_CONTRACT_MESSAGE_PREFIX"])
     ?? "Fluxer.JS hosted confidence probe";
   const reportPath = optionalEnvFromNames(["FLUXER_HOSTED_REPORT_PATH", "FLUXER_CONTRACT_REPORT_PATH"]);
+  const pinnedListLimit = Math.min(listLimit, 50);
   const report = createRunReport({
     instanceUrl,
     channelId,
@@ -353,6 +361,7 @@ async function main(): Promise<void> {
   if (!instanceInfo.gatewayBaseUrl) {
     throw new Error("Hosted confidence requires a gateway endpoint so the platform can start a session before sending messages.");
   }
+  requireWebSocketRuntime("Hosted confidence");
   const gatewayUrl = resolveHostedGatewayUrl(instanceInfo.gatewayBaseUrl, instanceInfo.apiCodeVersion);
 
   const transport = new PlatformTransport({
@@ -450,6 +459,25 @@ async function main(): Promise<void> {
     channelType: channel.type
   });
   console.log(`Hosted confidence channel: ${channel.name} (${channel.id})`);
+
+  recordStep(report, "list_pinned_messages", "started", {
+    channelId,
+    limit: pinnedListLimit
+  });
+  const pinnedMessages = await client.listPinnedMessages(channelId, {
+    limit: pinnedListLimit
+  });
+  report.pinnedMessages = {
+    count: pinnedMessages.items.length,
+    hasMore: pinnedMessages.hasMore,
+    newestMessageId: pinnedMessages.items[0]?.message.id,
+    newestPinnedAt: pinnedMessages.items[0]?.pinnedAt.toISOString()
+  };
+  recordStep(report, "list_pinned_messages", "passed", {
+    count: pinnedMessages.items.length,
+    hasMore: pinnedMessages.hasMore
+  });
+  console.log(`Pinned messages listed: ${pinnedMessages.items.length}${pinnedMessages.hasMore ? "+" : ""}`);
 
   recordStep(report, "indicate_typing", "started", {
     channelId

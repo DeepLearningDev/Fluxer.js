@@ -77,6 +77,19 @@ function renderSummary(report, inputPath) {
     lines.push(`- Type: ${String(report.channel.type ?? "unknown")}`, "");
   }
 
+  if (report.pinnedMessages) {
+    lines.push("## Pinned Messages", "");
+    lines.push(`- Count: ${String(report.pinnedMessages.count ?? "unknown")}`);
+    lines.push(`- Has More: ${report.pinnedMessages.hasMore === true ? "yes" : "no"}`);
+    if (report.pinnedMessages.newestMessageId) {
+      lines.push(`- Newest pinned message ID: ${String(report.pinnedMessages.newestMessageId)}`);
+    }
+    if (report.pinnedMessages.newestPinnedAt) {
+      lines.push(`- Newest pinned at: ${String(report.pinnedMessages.newestPinnedAt)}`);
+    }
+    lines.push("");
+  }
+
   if (report.probe) {
     lines.push("## Probe", "");
     lines.push(`- Content: ${String(report.probe.content ?? "unknown")}`);

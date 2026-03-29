@@ -563,8 +563,9 @@ test("serializes attachment payloads as multipart form data for rest transport",
   assert.equal(parsedPayload.embeds?.[0]?.image?.url, "attachment://graph.png");
 
   const uploadedFile = requestBody.get("files[0]");
-  assert.ok(uploadedFile instanceof File);
-  assert.equal(uploadedFile.name, "graph.png");
+  assert.ok(uploadedFile instanceof Blob);
+  assert.equal(Object.prototype.toString.call(uploadedFile), "[object File]");
+  assert.equal((uploadedFile as Blob & { name?: string }).name, "graph.png");
   assert.equal(uploadedFile.type, "image/png");
 
   const normalizedHeaders = new Headers(requestHeaders);

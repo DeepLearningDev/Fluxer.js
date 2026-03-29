@@ -11,6 +11,7 @@ import {
   loadExampleEnvFiles,
   optionalEnv,
   parseIntegerEnv,
+  requireWebSocketRuntime,
   requireEnv,
   sleep,
   writeReportIfConfigured as writeExampleReportIfConfigured
@@ -224,6 +225,7 @@ async function main(): Promise<void> {
   const keepAlive = process.env.FLUXER_KEEP_ALIVE === "1";
   const probePrefix = optionalEnv("FLUXER_CONTRACT_MESSAGE_PREFIX") ?? "Fluxer.JS live contract probe";
   const reportPath = optionalEnv("FLUXER_CONTRACT_REPORT_PATH");
+  requireWebSocketRuntime("Live contract harness");
   const report = createRunReport({
     instanceUrl,
     channelId,

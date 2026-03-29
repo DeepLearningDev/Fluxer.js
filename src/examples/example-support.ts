@@ -112,6 +112,16 @@ export function sleep(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
+export function requireWebSocketRuntime(exampleName: string): void {
+  if (typeof globalThis.WebSocket === "function") {
+    return;
+  }
+
+  throw new Error(
+    `${exampleName} requires a runtime with a global WebSocket implementation. Use Node 20+ or run the example in an environment that provides WebSocket.`
+  );
+}
+
 export async function writeReportIfConfigured<T extends { reportPath?: string }>(
   report: T,
   reportLabel: string
