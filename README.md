@@ -116,6 +116,14 @@ try {
 }
 ```
 
+For the narrowest real-instance smoke path in this repo, set `FLUXER_INSTANCE_URL` and `FLUXER_TOKEN`, then run:
+
+```bash
+npm run dev:platform
+```
+
+That example lives in `src/examples/real-instance-bootstrap.ts` and is documented in [docs/RealInstanceBootstrap.md](./docs/RealInstanceBootstrap.md). It is meant to prove bootstrap/connect confidence, not to stand in for a full live contract matrix.
+
 ## What You Get Today
 
 - `FluxerClient` and `FluxerBot`
@@ -140,6 +148,7 @@ Reference docs:
 
 - Changelog: [CHANGELOG.md](./CHANGELOG.md)
 - Release policy: [docs/ReleasePolicy.md](./docs/ReleasePolicy.md)
+- Real instance bootstrap: [docs/RealInstanceBootstrap.md](./docs/RealInstanceBootstrap.md)
 - API guarantees: [docs/ApiGuarantees.md](./docs/ApiGuarantees.md)
 - Gateway error codes: [docs/GatewayErrorCodes.md](./docs/GatewayErrorCodes.md)
 - REST error codes: [docs/RestErrorCodes.md](./docs/RestErrorCodes.md)

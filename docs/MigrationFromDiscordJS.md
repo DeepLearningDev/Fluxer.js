@@ -73,6 +73,7 @@ Instead of hand-building message objects repeatedly, prefer:
 
 - start by porting event listeners and basic commands into `FluxerBot`
 - switch to `createFluxerPlatformTransport(...)` once you want real hosted or self-hosted Fluxer connectivity
+- use `src/examples/real-instance-bootstrap.ts` and `docs/RealInstanceBootstrap.md` as the first honest live-bot path once your mock bot works locally
 - use `gatewayDispatch` for platform events that are not normalized yet
 - move rich payload helpers into builders/templates early so commands stay small
 - use `FluxerTestRuntime` to lock framework behavior down while migrating larger bots, but treat it as a mock-first harness rather than a live Fluxer contract test layer
