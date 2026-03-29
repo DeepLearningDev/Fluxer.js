@@ -1107,16 +1107,32 @@ function parseRestRole(
   }
 ): FluxerRole {
   const role = payload as {
-    id?: string;
-    name?: string;
-    color?: number;
-    position?: number;
-    permissions?: string;
+    id?: unknown;
+    name?: unknown;
+    color?: unknown;
+    position?: unknown;
+    permissions?: unknown;
   };
 
-  if (!role?.id || !role.name) {
+  if (typeof role?.id !== "string" || typeof role.name !== "string") {
     throw new RestTransportError({
       message: "RestTransport received a role response with missing required fields.",
+      code: "REST_RESPONSE_INVALID",
+      retryable: false,
+      details: {
+        ...context,
+        payload
+      }
+    });
+  }
+
+  if (
+    (role.color !== undefined && typeof role.color !== "number")
+    || (role.position !== undefined && typeof role.position !== "number")
+    || (role.permissions !== undefined && typeof role.permissions !== "string")
+  ) {
+    throw new RestTransportError({
+      message: "RestTransport received a role response with invalid optional field types.",
       code: "REST_RESPONSE_INVALID",
       retryable: false,
       details: {

@@ -1150,17 +1150,27 @@ export class FluxerClient extends EventEmitter {
 
   #parseGatewayRole(event: FluxerGatewayDispatchEvent): FluxerRole | null {
     const payload = event.data as {
-      guild_id?: string;
+      guild_id?: unknown;
       role?: {
-        id?: string;
-        name?: string;
-        color?: number;
-        position?: number;
-        permissions?: string;
+        id?: unknown;
+        name?: unknown;
+        color?: unknown;
+        position?: unknown;
+        permissions?: unknown;
       };
     };
 
-    if (!payload.guild_id || !payload.role?.id || !payload.role.name) {
+    const color = this.#parseOptionalNumber(payload.role?.color);
+    const position = this.#parseOptionalNumber(payload.role?.position);
+    const permissions = this.#parseOptionalString(payload.role?.permissions);
+    if (
+      typeof payload.guild_id !== "string"
+      || typeof payload.role?.id !== "string"
+      || typeof payload.role.name !== "string"
+      || color === null
+      || position === null
+      || permissions === null
+    ) {
       return null;
     }
 
@@ -1168,9 +1178,9 @@ export class FluxerClient extends EventEmitter {
       id: payload.role.id,
       guildId: payload.guild_id,
       name: payload.role.name,
-      color: payload.role.color,
-      position: payload.role.position,
-      permissions: payload.role.permissions
+      color,
+      position,
+      permissions
     };
   }
 
@@ -1438,6 +1448,14 @@ export class FluxerClient extends EventEmitter {
     }
 
     return [...value];
+  }
+
+  #parseOptionalNumber(value: unknown): number | undefined | null {
+    if (value === undefined || value === null) {
+      return undefined;
+    }
+
+    return typeof value === "number" ? value : null;
   }
 
   #parseGatewayUser(payload: unknown): FluxerUser | null {

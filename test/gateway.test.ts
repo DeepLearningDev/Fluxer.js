@@ -1326,6 +1326,96 @@ test("drops guild member gateway events with invalid member field types and emit
   );
 });
 
+test("drops guild role gateway events with invalid role field types and emits warnings", async () => {
+  const transport = new MockTransport();
+  const client = new FluxerClient(transport);
+  const debugEvents: Array<{ event: string; level?: string; data?: Record<string, unknown> }> = [];
+  const domainEvents: string[] = [];
+
+  client.on("debug", (event) => {
+    debugEvents.push({
+      event: event.event,
+      level: event.level,
+      data: event.data as Record<string, unknown> | undefined
+    });
+  });
+
+  client.on("roleCreate", () => {
+    domainEvents.push("roleCreate");
+  });
+
+  client.on("roleUpdate", () => {
+    domainEvents.push("roleUpdate");
+  });
+
+  await client.receiveGatewayDispatch({
+    type: "GUILD_ROLE_CREATE",
+    sequence: 17,
+    data: {
+      guild_id: "guild_1",
+      role: {
+        id: "role_1",
+        name: "moderator",
+        color: "red"
+      }
+    },
+    raw: {
+      op: 0,
+      d: {
+        guild_id: "guild_1",
+        role: {
+          id: "role_1",
+          name: "moderator",
+          color: "red"
+        }
+      },
+      s: 17,
+      t: "GUILD_ROLE_CREATE"
+    }
+  });
+
+  await client.receiveGatewayDispatch({
+    type: "GUILD_ROLE_UPDATE",
+    sequence: 18,
+    data: {
+      guild_id: "guild_1",
+      role: {
+        id: "role_1",
+        name: "moderator",
+        permissions: 1234
+      }
+    },
+    raw: {
+      op: 0,
+      d: {
+        guild_id: "guild_1",
+        role: {
+          id: "role_1",
+          name: "moderator",
+          permissions: 1234
+        }
+      },
+      s: 18,
+      t: "GUILD_ROLE_UPDATE"
+    }
+  });
+
+  assert.deepEqual(domainEvents, []);
+
+  const ignoredEvents = debugEvents.filter((event) => event.event === "gateway_dispatch_ignored");
+  assert.deepEqual(
+    ignoredEvents.map((event) => ({
+      level: event.level,
+      type: event.data?.type,
+      reason: event.data?.reason
+    })),
+    [
+      { level: "warn", type: "GUILD_ROLE_CREATE", reason: "invalid_role_payload" },
+      { level: "warn", type: "GUILD_ROLE_UPDATE", reason: "invalid_role_payload" }
+    ]
+  );
+});
+
 test("maps role, reaction, and voice gateway events", async () => {
   const transport = new MockTransport();
   const client = new FluxerClient(transport);

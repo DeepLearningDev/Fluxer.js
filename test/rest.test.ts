@@ -1275,6 +1275,36 @@ test("lists guild roles through rest transport", async () => {
   ]);
 });
 
+test("rejects invalid role field types from rest transport", async () => {
+  const transport = new RestTransport({
+    baseUrl: "https://fluxer.local/api",
+    fetchImpl: async () =>
+      new Response(JSON.stringify([
+        {
+          id: "role_1",
+          name: "Moderator",
+          color: "red"
+        }
+      ]), {
+        status: 200,
+        headers: {
+          "content-type": "application/json"
+        }
+      })
+  });
+
+  await assert.rejects(async () => {
+    await transport.listGuildRoles("guild_42");
+  }, (error: unknown) => {
+    assert.ok(error instanceof RestTransportError);
+    assert.equal(error.code, "REST_RESPONSE_INVALID");
+    assert.equal(error.details?.method, "GET");
+    assert.equal(error.details?.url, "https://fluxer.local/api/v1/guilds/guild_42/roles");
+    assert.equal(error.details?.guildId, "guild_42");
+    return true;
+  });
+});
+
 test("surfaces rate-limit metadata for invite and guild reads", async () => {
   const scenarios = [
     {
