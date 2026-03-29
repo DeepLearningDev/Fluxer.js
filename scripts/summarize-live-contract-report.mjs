@@ -81,6 +81,12 @@ function renderSummary(report, inputPath) {
     lines.push("## Probe", "");
     lines.push(`- Content: ${String(report.probe.content ?? "unknown")}`);
     lines.push(`- Confirmed message ID: ${String(report.probe.confirmedMessageId ?? "not confirmed")}`);
+    if (report.probe.gatewayObservedMessageId) {
+      lines.push(`- Gateway observed message ID: ${String(report.probe.gatewayObservedMessageId)}`);
+    }
+    if (report.probe.gatewayObservedMessageContent) {
+      lines.push(`- Gateway observed content: ${String(report.probe.gatewayObservedMessageContent)}`);
+    }
     if (report.probe.fetchedMessageId) {
       lines.push(`- Direct fetch message ID: ${String(report.probe.fetchedMessageId)}`);
     }

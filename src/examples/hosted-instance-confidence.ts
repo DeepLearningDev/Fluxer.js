@@ -63,6 +63,8 @@ interface HostedConfidenceReport {
   probe?: {
     content: string;
     confirmedMessageId?: string;
+    gatewayObservedMessageId?: string;
+    gatewayObservedMessageContent?: string;
     fetchedMessageId?: string;
     fetchedMessageContent?: string;
     editedContent?: string;
@@ -234,6 +236,27 @@ async function waitForGatewayReady(client: FluxerClient, timeoutMs: number): Pro
   });
 
   await Promise.race([readyPromise, failedStatePromise]);
+}
+
+async function waitForHostedGatewayProbe(options: {
+  client: FluxerClient;
+  channelId: string;
+  probeContent: string;
+  currentUserId: string;
+  timeoutMs: number;
+}): Promise<{ id: string; content: string }> {
+  const message = await options.client.waitFor("messageCreate", {
+    timeoutMs: options.timeoutMs,
+    filter: (candidate) =>
+      candidate.channel.id === options.channelId
+      && candidate.author.id === options.currentUserId
+      && candidate.content === options.probeContent
+  });
+
+  return {
+    id: message.id,
+    content: message.content
+  };
 }
 
 function listEnabledCapabilities(capabilities: object): string[] {
@@ -442,6 +465,17 @@ async function main(): Promise<void> {
     content: probeContent
   };
   console.log(`Sending hosted confidence probe: ${probeContent}`);
+  recordStep(report, "observe_probe_via_gateway", "started", {
+    channelId,
+    timeoutMs
+  });
+  const gatewayProbePromise = waitForHostedGatewayProbe({
+    client,
+    channelId,
+    probeContent,
+    currentUserId: currentUser.id,
+    timeoutMs
+  });
   recordStep(report, "send_probe", "started", {
     channelId,
     probeContent
@@ -451,6 +485,14 @@ async function main(): Promise<void> {
     channelId,
     probeContent
   });
+
+  const gatewayObservedProbe = await gatewayProbePromise;
+  report.probe.gatewayObservedMessageId = gatewayObservedProbe.id;
+  report.probe.gatewayObservedMessageContent = gatewayObservedProbe.content;
+  recordStep(report, "observe_probe_via_gateway", "passed", {
+    messageId: gatewayObservedProbe.id
+  });
+  console.log(`Probe observed through hosted gateway dispatch: ${gatewayObservedProbe.id}`);
 
   recordStep(report, "confirm_probe", "started", {
     channelId,

@@ -140,7 +140,7 @@ npm run dev:hosted
 ```
 
 That path also supports `FLUXER_HOSTED_REPORT_PATH` and is documented in [docs/HostedInstanceConfidence.md](./docs/HostedInstanceConfidence.md).
-It now proves hosted identity fetch, channel read-back, direct `fetchMessage(...)`, an edit-plus-refetch cycle, typed delete confirmation, and deleted-history absence on the confirmed probe.
+It now proves hosted gateway delivery for the live probe, hosted identity fetch, channel read-back, direct `fetchMessage(...)`, an edit-plus-refetch cycle, typed delete confirmation, and deleted-history absence on the confirmed probe.
 
 These examples live in `src/examples/real-instance-bootstrap.ts`, `src/examples/live-instance-contract.ts`, and `src/examples/hosted-instance-confidence.ts` and are documented in [docs/RealInstanceBootstrap.md](./docs/RealInstanceBootstrap.md), [docs/FirstRealBot.md](./docs/FirstRealBot.md), [docs/LiveInstanceContractHarness.md](./docs/LiveInstanceContractHarness.md), and [docs/HostedInstanceConfidence.md](./docs/HostedInstanceConfidence.md). They are meant to prove narrow live confidence layers, not to stand in for a full live contract matrix.
 
