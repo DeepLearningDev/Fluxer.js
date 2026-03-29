@@ -920,6 +920,189 @@ test("fetches users by id through rest transport", async () => {
   });
 });
 
+test("surfaces rate-limit metadata for identity and channel reads", async () => {
+  const scenarios = [
+    {
+      name: "fetchChannel",
+      invoke: (transport: RestTransport) => transport.fetchChannel("general"),
+      response: () =>
+        createRateLimitedResponse({
+          body: {
+            retry_after_ms: 750,
+            global: false
+          },
+          headers: {
+            "x-ratelimit-bucket": "channels:general"
+          }
+        }),
+      expected: {
+        method: "GET",
+        url: "https://fluxer.local/api/v1/channels/general",
+        channelId: "general",
+        retryAfterMs: 750,
+        retryAfterSource: "body",
+        global: false
+      }
+    },
+    {
+      name: "fetchCurrentUser",
+      invoke: (transport: RestTransport) => transport.fetchCurrentUser(),
+      response: () =>
+        createRateLimitedResponse({
+          headers: {
+            "x-ratelimit-reset-after": "0.5",
+            "x-ratelimit-bucket": "users:@me"
+          }
+        }),
+      expected: {
+        method: "GET",
+        url: "https://fluxer.local/api/v1/users/@me",
+        retryAfterMs: 500,
+        retryAfterSource: "reset_after"
+      }
+    },
+    {
+      name: "fetchUser",
+      invoke: (transport: RestTransport) => transport.fetchUser("user_42"),
+      response: () =>
+        createRateLimitedResponse({
+          body: {
+            retry_after: 1.2,
+            global: true
+          },
+          headers: {
+            "retry-after": "2"
+          }
+        }),
+      expected: {
+        method: "GET",
+        url: "https://fluxer.local/api/v1/users/user_42",
+        userId: "user_42",
+        retryAfterMs: 2000,
+        retryAfterSource: "header",
+        global: true
+      }
+    }
+  ] as const;
+
+  for (const scenario of scenarios) {
+    const transport = new RestTransport({
+      baseUrl: "https://fluxer.local/api",
+      fetchImpl: async () => scenario.response()
+    });
+
+    await assert.rejects(async () => {
+      await scenario.invoke(transport);
+    }, (error: unknown) => {
+      assert.ok(error instanceof RestTransportError, `${scenario.name} should reject with RestTransportError`);
+      assert.equal(error.code, "REST_RATE_LIMITED");
+      assert.equal(error.status, 429);
+      assert.equal(error.retryable, true);
+      assert.equal(error.details?.method, scenario.expected.method);
+      assert.equal(error.details?.url, scenario.expected.url);
+      assert.equal(
+        error.details?.channelId,
+        "channelId" in scenario.expected ? scenario.expected.channelId : undefined
+      );
+      assert.equal(
+        error.details?.userId,
+        "userId" in scenario.expected ? scenario.expected.userId : undefined
+      );
+      assert.equal(error.retryAfterMs, scenario.expected.retryAfterMs);
+      assert.equal(error.details?.retryAfterMs, scenario.expected.retryAfterMs);
+      assert.equal(error.details?.retryAfterSource, scenario.expected.retryAfterSource);
+      assert.equal(
+        error.details?.global,
+        "global" in scenario.expected ? scenario.expected.global : undefined
+      );
+      return true;
+    });
+  }
+});
+
+test("rejects invalid identity and channel responses from rest transport", async () => {
+  const scenarios = [
+    {
+      name: "fetchChannel",
+      invoke: (transport: RestTransport) => transport.fetchChannel("general"),
+      response: () =>
+        new Response(JSON.stringify({
+          id: "general"
+        }), {
+          status: 200,
+          headers: {
+            "content-type": "application/json"
+          }
+        }),
+      expected: {
+        method: "GET",
+        url: "https://fluxer.local/api/v1/channels/general",
+        channelId: "general"
+      }
+    },
+    {
+      name: "fetchCurrentUser",
+      invoke: (transport: RestTransport) => transport.fetchCurrentUser(),
+      response: () =>
+        new Response(JSON.stringify({
+          id: "bot_1"
+        }), {
+          status: 200,
+          headers: {
+            "content-type": "application/json"
+          }
+        }),
+      expected: {
+        method: "GET",
+        url: "https://fluxer.local/api/v1/users/@me"
+      }
+    },
+    {
+      name: "fetchUser",
+      invoke: (transport: RestTransport) => transport.fetchUser("user_42"),
+      response: () =>
+        new Response(JSON.stringify({
+          id: "user_42"
+        }), {
+          status: 200,
+          headers: {
+            "content-type": "application/json"
+          }
+        }),
+      expected: {
+        method: "GET",
+        url: "https://fluxer.local/api/v1/users/user_42",
+        userId: "user_42"
+      }
+    }
+  ] as const;
+
+  for (const scenario of scenarios) {
+    const transport = new RestTransport({
+      baseUrl: "https://fluxer.local/api",
+      fetchImpl: async () => scenario.response()
+    });
+
+    await assert.rejects(async () => {
+      await scenario.invoke(transport);
+    }, (error: unknown) => {
+      assert.ok(error instanceof RestTransportError, `${scenario.name} should reject with RestTransportError`);
+      assert.equal(error.code, "REST_RESPONSE_INVALID");
+      assert.equal(error.details?.method, scenario.expected.method);
+      assert.equal(error.details?.url, scenario.expected.url);
+      assert.equal(
+        error.details?.channelId,
+        "channelId" in scenario.expected ? scenario.expected.channelId : undefined
+      );
+      assert.equal(
+        error.details?.userId,
+        "userId" in scenario.expected ? scenario.expected.userId : undefined
+      );
+      return true;
+    });
+  }
+});
+
 test("fetches invite information through rest transport", async () => {
   const requests: string[] = [];
 
