@@ -1125,6 +1125,103 @@ test("lists pinned messages through rest transport with pagination query params"
   );
 });
 
+test("surfaces rate-limit metadata for pinned message listing", async () => {
+  const transport = new RestTransport({
+    baseUrl: "https://fluxer.local/api",
+    fetchImpl: async () =>
+      createRateLimitedResponse({
+        body: {
+          retry_after_ms: 900,
+          global: false
+        },
+        headers: {
+          "x-ratelimit-bucket": "pins:general"
+        }
+      })
+  });
+
+  await assert.rejects(async () => {
+    await transport.listPinnedMessages("general", {
+      limit: 2
+    });
+  }, (error: unknown) => {
+    assert.ok(error instanceof RestTransportError);
+    assert.equal(error.code, "REST_RATE_LIMITED");
+    assert.equal(error.status, 429);
+    assert.equal(error.retryAfterMs, 900);
+    assert.equal(error.details?.method, "GET");
+    assert.equal(error.details?.url, "https://fluxer.local/api/v1/channels/general/messages/pins?limit=2");
+    assert.equal(error.details?.channelId, "general");
+    assert.equal(error.details?.retryAfterSource, "body");
+    assert.equal(error.details?.bucket, "pins:general");
+    assert.equal(error.details?.global, false);
+    return true;
+  });
+});
+
+test("rejects invalid pinned message responses from rest transport", async () => {
+  const scenarios = [
+    {
+      name: "invalid response shape",
+      response: () =>
+        new Response(JSON.stringify({
+          items: "not-an-array",
+          has_more: true
+        }), {
+          status: 200,
+          headers: {
+            "content-type": "application/json"
+          }
+        })
+    },
+    {
+      name: "invalid pin timestamp",
+      response: () =>
+        new Response(JSON.stringify({
+          items: [
+            {
+              message: {
+                id: "msg_1",
+                content: "hello",
+                channel_id: "general",
+                timestamp: "2026-03-18T22:00:00.000Z",
+                author: {
+                  id: "user_1",
+                  username: "fluxguy"
+                }
+              },
+              pinned_at: "not-a-date"
+            }
+          ],
+          has_more: false
+        }), {
+          status: 200,
+          headers: {
+            "content-type": "application/json"
+          }
+        })
+    }
+  ] as const;
+
+  for (const scenario of scenarios) {
+    const transport = new RestTransport({
+      baseUrl: "https://fluxer.local/api",
+      fetchImpl: async () => scenario.response()
+    });
+
+    await assert.rejects(async () => {
+      await transport.listPinnedMessages("general");
+    }, (error: unknown) => {
+      assert.ok(error instanceof RestTransportError, `${scenario.name} should reject with RestTransportError`);
+      assert.equal(error.code, "REST_RESPONSE_INVALID");
+      assert.equal(error.details?.method, "GET");
+      assert.equal(error.details?.url, "https://fluxer.local/api/v1/channels/general/messages/pins");
+      assert.equal(error.details?.channelId, "general");
+      return true;
+    });
+  }
+});
+
 test("indicates typing activity through rest transport", async () => {
   const requests: Array<{ method?: string; url: string }> = [];
 
