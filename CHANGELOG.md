@@ -23,6 +23,7 @@ with pre-release channels while the framework is not yet stable.
 - wait and collector guidance now has a dedicated guide in both the repo docs and the GitHub wiki
 - the hosted confidence path now also fetches the confirmed probe directly by message ID so the hosted lane proves one more honest read surface
 - the hosted confidence path now also edits the confirmed probe and re-fetches it so the hosted lane proves one more honest message-lifecycle step
+- the hosted confidence path now also deletes the edited probe and confirms the expected typed 404 fetch failure
 
 ### Fixed
 

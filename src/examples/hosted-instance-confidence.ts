@@ -60,6 +60,9 @@ interface HostedConfidenceReport {
     editedMessageId?: string;
     fetchedEditedMessageId?: string;
     fetchedEditedMessageContent?: string;
+    deletedMessageId?: string;
+    deletedFetchCode?: string;
+    deletedFetchStatus?: number;
   };
   steps: ConfidenceStepRecord[];
   error?: {
@@ -581,6 +584,38 @@ async function main(): Promise<void> {
     messageId: fetchedEditedMessage.id
   });
   console.log(`Fetched edited probe directly: ${fetchedEditedMessage.id}`);
+
+  recordStep(report, "delete_probe", "started", {
+    channelId,
+    messageId: confirmedMessageId
+  });
+  await client.deleteMessage(channelId, confirmedMessageId);
+  report.probe.deletedMessageId = confirmedMessageId;
+  recordStep(report, "delete_probe", "passed", {
+    messageId: confirmedMessageId
+  });
+  console.log(`Deleted confirmed probe: ${confirmedMessageId}`);
+
+  recordStep(report, "confirm_probe_deleted", "started", {
+    channelId,
+    messageId: confirmedMessageId
+  });
+  try {
+    await client.fetchMessage(channelId, confirmedMessageId);
+    throw new Error("Deleted probe was still fetchable after deleteMessage completed.");
+  } catch (error) {
+    if (!(error instanceof RestTransportError) || error.code !== "REST_HTTP_ERROR" || error.status !== 404) {
+      throw error;
+    }
+
+    report.probe.deletedFetchCode = error.code;
+    report.probe.deletedFetchStatus = error.status;
+    recordStep(report, "confirm_probe_deleted", "passed", {
+      code: error.code,
+      status: error.status
+    });
+    console.log(`Confirmed deleted probe is no longer fetchable: ${error.code} (${error.status})`);
+  }
 
   recordStep(report, "disconnect", "started");
   await client.disconnect();

@@ -89,6 +89,15 @@ function renderSummary(report, inputPath) {
     if (report.probe.fetchedEditedMessageContent) {
       lines.push(`- Fetched edited content: ${String(report.probe.fetchedEditedMessageContent)}`);
     }
+    if (report.probe.deletedMessageId) {
+      lines.push(`- Deleted message ID: ${String(report.probe.deletedMessageId)}`);
+    }
+    if (report.probe.deletedFetchCode) {
+      lines.push(`- Deleted fetch code: ${String(report.probe.deletedFetchCode)}`);
+    }
+    if (report.probe.deletedFetchStatus !== undefined) {
+      lines.push(`- Deleted fetch status: ${String(report.probe.deletedFetchStatus)}`);
+    }
     lines.push("");
   }
 
