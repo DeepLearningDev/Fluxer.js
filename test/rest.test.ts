@@ -1274,6 +1274,252 @@ test("lists guild roles through rest transport", async () => {
   ]);
 });
 
+test("surfaces rate-limit metadata for invite and guild reads", async () => {
+  const scenarios = [
+    {
+      name: "fetchInvite",
+      invoke: (transport: RestTransport) => transport.fetchInvite("fluxer"),
+      response: () =>
+        createRateLimitedResponse({
+          body: {
+            retry_after_ms: 1100,
+            global: false
+          },
+          headers: {
+            "x-ratelimit-bucket": "invites:fluxer"
+          }
+        }),
+      expected: {
+        method: "GET",
+        url: "https://fluxer.local/api/v1/invites/fluxer",
+        inviteCode: "fluxer",
+        retryAfterMs: 1100,
+        retryAfterSource: "body",
+        global: false
+      }
+    },
+    {
+      name: "fetchGuild",
+      invoke: (transport: RestTransport) => transport.fetchGuild("guild_42"),
+      response: () =>
+        createRateLimitedResponse({
+          headers: {
+            "x-ratelimit-reset-after": "0.8",
+            "x-ratelimit-bucket": "guilds:guild_42"
+          }
+        }),
+      expected: {
+        method: "GET",
+        url: "https://fluxer.local/api/v1/guilds/guild_42",
+        guildId: "guild_42",
+        retryAfterMs: 800,
+        retryAfterSource: "reset_after"
+      }
+    },
+    {
+      name: "listGuildChannels",
+      invoke: (transport: RestTransport) => transport.listGuildChannels("guild_42"),
+      response: () =>
+        createRateLimitedResponse({
+          body: {
+            retry_after: 1.5,
+            global: true
+          },
+          headers: {
+            "retry-after": "2"
+          }
+        }),
+      expected: {
+        method: "GET",
+        url: "https://fluxer.local/api/v1/guilds/guild_42/channels",
+        guildId: "guild_42",
+        retryAfterMs: 2000,
+        retryAfterSource: "header",
+        global: true
+      }
+    },
+    {
+      name: "fetchGuildMember",
+      invoke: (transport: RestTransport) => transport.fetchGuildMember("guild_42", "user_99"),
+      response: () =>
+        createRateLimitedResponse({
+          body: {
+            retry_after_ms: 600
+          }
+        }),
+      expected: {
+        method: "GET",
+        url: "https://fluxer.local/api/v1/guilds/guild_42/members/user_99",
+        guildId: "guild_42",
+        userId: "user_99",
+        retryAfterMs: 600,
+        retryAfterSource: "body"
+      }
+    },
+    {
+      name: "listGuildRoles",
+      invoke: (transport: RestTransport) => transport.listGuildRoles("guild_42"),
+      response: () =>
+        createRateLimitedResponse({
+          headers: {
+            "x-ratelimit-reset-after": "0.4"
+          }
+        }),
+      expected: {
+        method: "GET",
+        url: "https://fluxer.local/api/v1/guilds/guild_42/roles",
+        guildId: "guild_42",
+        retryAfterMs: 400,
+        retryAfterSource: "reset_after"
+      }
+    }
+  ] as const;
+
+  for (const scenario of scenarios) {
+    const transport = new RestTransport({
+      baseUrl: "https://fluxer.local/api",
+      fetchImpl: async () => scenario.response()
+    });
+
+    await assert.rejects(async () => {
+      await scenario.invoke(transport);
+    }, (error: unknown) => {
+      assert.ok(error instanceof RestTransportError, `${scenario.name} should reject with RestTransportError`);
+      assert.equal(error.code, "REST_RATE_LIMITED");
+      assert.equal(error.status, 429);
+      assert.equal(error.retryable, true);
+      assert.equal(error.details?.method, scenario.expected.method);
+      assert.equal(error.details?.url, scenario.expected.url);
+      assert.equal(
+        error.details?.inviteCode,
+        "inviteCode" in scenario.expected ? scenario.expected.inviteCode : undefined
+      );
+      assert.equal(
+        error.details?.guildId,
+        "guildId" in scenario.expected ? scenario.expected.guildId : undefined
+      );
+      assert.equal(
+        error.details?.userId,
+        "userId" in scenario.expected ? scenario.expected.userId : undefined
+      );
+      assert.equal(error.retryAfterMs, scenario.expected.retryAfterMs);
+      assert.equal(error.details?.retryAfterMs, scenario.expected.retryAfterMs);
+      assert.equal(error.details?.retryAfterSource, scenario.expected.retryAfterSource);
+      assert.equal(
+        error.details?.global,
+        "global" in scenario.expected ? scenario.expected.global : undefined
+      );
+      return true;
+    });
+  }
+});
+
+test("rejects invalid invite and guild responses from rest transport", async () => {
+  const scenarios = [
+    {
+      name: "fetchInvite",
+      invoke: (transport: RestTransport) => transport.fetchInvite("fluxer"),
+      response: () =>
+        new Response(JSON.stringify({
+          guild: {
+            id: "guild_42"
+          }
+        }), {
+          status: 200,
+          headers: {
+            "content-type": "application/json"
+          }
+        }),
+      expected: {
+        method: "GET",
+        url: "https://fluxer.local/api/v1/invites/fluxer",
+        inviteCode: "fluxer"
+      }
+    },
+    {
+      name: "fetchGuild",
+      invoke: (transport: RestTransport) => transport.fetchGuild("guild_42"),
+      response: () =>
+        new Response(JSON.stringify({
+          id: "guild_42"
+        }), {
+          status: 200,
+          headers: {
+            "content-type": "application/json"
+          }
+        }),
+      expected: {
+        method: "GET",
+        url: "https://fluxer.local/api/v1/guilds/guild_42",
+        guildId: "guild_42"
+      }
+    },
+    {
+      name: "listGuildChannels",
+      invoke: (transport: RestTransport) => transport.listGuildChannels("guild_42"),
+      response: () =>
+        new Response(JSON.stringify({
+          channels: []
+        }), {
+          status: 200,
+          headers: {
+            "content-type": "application/json"
+          }
+        }),
+      expected: {
+        method: "GET",
+        url: "https://fluxer.local/api/v1/guilds/guild_42/channels",
+        guildId: "guild_42"
+      }
+    },
+    {
+      name: "listGuildRoles",
+      invoke: (transport: RestTransport) => transport.listGuildRoles("guild_42"),
+      response: () =>
+        new Response(JSON.stringify([
+          {
+            id: "role_1"
+          }
+        ]), {
+          status: 200,
+          headers: {
+            "content-type": "application/json"
+          }
+        }),
+      expected: {
+        method: "GET",
+        url: "https://fluxer.local/api/v1/guilds/guild_42/roles",
+        guildId: "guild_42"
+      }
+    }
+  ] as const;
+
+  for (const scenario of scenarios) {
+    const transport = new RestTransport({
+      baseUrl: "https://fluxer.local/api",
+      fetchImpl: async () => scenario.response()
+    });
+
+    await assert.rejects(async () => {
+      await scenario.invoke(transport);
+    }, (error: unknown) => {
+      assert.ok(error instanceof RestTransportError, `${scenario.name} should reject with RestTransportError`);
+      assert.equal(error.code, "REST_RESPONSE_INVALID");
+      assert.equal(error.details?.method, scenario.expected.method);
+      assert.equal(error.details?.url, scenario.expected.url);
+      assert.equal(
+        error.details?.inviteCode,
+        "inviteCode" in scenario.expected ? scenario.expected.inviteCode : undefined
+      );
+      assert.equal(
+        error.details?.guildId,
+        "guildId" in scenario.expected ? scenario.expected.guildId : undefined
+      );
+      return true;
+    });
+  }
+});
+
 test("lists pinned messages through rest transport with pagination query params", async () => {
   const requests: string[] = [];
 
