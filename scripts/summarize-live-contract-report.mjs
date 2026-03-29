@@ -104,6 +104,9 @@ function renderSummary(report, inputPath) {
     if (report.probe.deletedFetchStatus !== undefined) {
       lines.push(`- Deleted fetch status: ${String(report.probe.deletedFetchStatus)}`);
     }
+    if (report.probe.deletedHistoryAbsent === true) {
+      lines.push("- Deleted probe absent from recent history: yes");
+    }
     lines.push("");
   }
 

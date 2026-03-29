@@ -67,6 +67,7 @@ interface HostedConfidenceReport {
     deletedMessageId?: string;
     deletedFetchCode?: string;
     deletedFetchStatus?: number;
+    deletedHistoryAbsent?: boolean;
   };
   steps: ConfidenceStepRecord[];
   error?: {
@@ -637,6 +638,27 @@ async function main(): Promise<void> {
     });
     console.log(`Confirmed deleted probe is no longer fetchable: ${error.code} (${error.status})`);
   }
+
+  recordStep(report, "confirm_probe_deleted_from_history", "started", {
+    channelId,
+    limit: listLimit
+  });
+  const recentMessagesAfterDelete = await client.listMessages(channelId, {
+    limit: listLimit
+  });
+  const deletedMessageStillPresent = recentMessagesAfterDelete.some((message) =>
+    message.id === confirmedMessageId
+    || (message.author.id === currentUser.id
+      && (message.content === probeContent || message.content === editedProbeContent))
+  );
+  if (deletedMessageStillPresent) {
+    throw new Error("Deleted probe was still present in recent channel history after deleteMessage completed.");
+  }
+  report.probe.deletedHistoryAbsent = true;
+  recordStep(report, "confirm_probe_deleted_from_history", "passed", {
+    count: recentMessagesAfterDelete.length
+  });
+  console.log("Confirmed deleted probe is absent from recent channel history.");
 
   recordStep(report, "disconnect", "started");
   await client.disconnect();

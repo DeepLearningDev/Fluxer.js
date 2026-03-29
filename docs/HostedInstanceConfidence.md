@@ -16,6 +16,7 @@ Use it when the official hosted Fluxer API is your target and the stronger bot-r
 - the confirmed probe can be fetched directly by message ID
 - the confirmed probe can be edited and re-fetched with the edited content intact
 - the edited probe can be deleted and confirmed absent through a typed 404 fetch failure
+- the deleted probe is also confirmed absent from recent channel history
 
 This is intentionally narrower than the self-hosted live contract harness because it does not prove the stronger bot-gateway bootstrap path or bot-runtime command handling.
 
@@ -68,13 +69,14 @@ If the hosted path succeeds, it will:
 - fetch that confirmed probe directly through `fetchMessage(...)`
 - edit that confirmed probe and fetch it again to verify the edited content
 - delete that probe and verify that `fetchMessage(...)` now fails with the expected typed 404 path
+- confirm that the deleted probe no longer appears in recent channel history either
 
 If `FLUXER_HOSTED_REPORT_PATH` is set, the path also writes a JSON report with:
 
 - run timestamps
 - instance capability snapshot
 - current bot identity plus a direct `fetchUser(...)` proof
-- probe content, confirmed message ID, direct fetch confirmation, edited-message confirmation, and delete confirmation
+- probe content, confirmed message ID, direct fetch confirmation, edited-message confirmation, delete confirmation, and deleted-history absence confirmation
 - typed failure metadata when the run fails
 
 You can turn that JSON artifact into a markdown summary with:

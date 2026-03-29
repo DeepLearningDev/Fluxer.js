@@ -73,3 +73,6 @@ with pre-release channels while the framework is not yet stable.
 - Public APIs may still change between alpha releases when doing so materially improves correctness or ergonomics
 
 
+# Unreleased
+
+- hosted confidence now verifies that a deleted probe is absent from recent channel history, not just unavailable through direct fetch
