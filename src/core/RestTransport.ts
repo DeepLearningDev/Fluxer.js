@@ -24,6 +24,7 @@ import type {
 
 export class RestTransport extends BaseTransport {
   #baseUrl?: string;
+  #baseUrlPromise?: Promise<string>;
   readonly #instanceUrl?: string;
   readonly #auth?: FluxerRestTransportOptions["auth"];
   readonly #fetchImpl: typeof fetch;
@@ -662,6 +663,10 @@ export class RestTransport extends BaseTransport {
       return this.#baseUrl;
     }
 
+    if (this.#baseUrlPromise) {
+      return this.#baseUrlPromise;
+    }
+
     if (this.#discovery) {
       this.#baseUrl = resolveBotApiBaseUrl(this.#discovery);
       return this.#baseUrl;
@@ -680,26 +685,35 @@ export class RestTransport extends BaseTransport {
       });
     }
 
-    let discovery: FluxerInstanceDiscoveryDocument;
-    try {
-      discovery = await fetchInstanceDiscoveryDocument({
-        instanceUrl: this.#instanceUrl,
-        fetchImpl: this.#fetchImpl
-      });
-    } catch (error) {
-      throw new RestTransportError({
-        message: "RestTransport failed to fetch the instance discovery document.",
-        code: "REST_DISCOVERY_FAILED",
-        retryable: true,
-        details: {
-          instanceUrl: this.#instanceUrl,
-          message: error instanceof Error ? error.message : String(error)
-        }
-      });
-    }
+    this.#baseUrlPromise = (async () => {
+      let discovery: FluxerInstanceDiscoveryDocument;
+      try {
+        discovery = await fetchInstanceDiscoveryDocument({
+          instanceUrl: this.#instanceUrl!,
+          fetchImpl: this.#fetchImpl
+        });
+      } catch (error) {
+        throw new RestTransportError({
+          message: "RestTransport failed to fetch the instance discovery document.",
+          code: "REST_DISCOVERY_FAILED",
+          retryable: true,
+          details: {
+            instanceUrl: this.#instanceUrl,
+            message: error instanceof Error ? error.message : String(error)
+          }
+        });
+      }
 
-    this.#baseUrl = resolveBotApiBaseUrl(discovery);
-    return this.#baseUrl;
+      const baseUrl = resolveBotApiBaseUrl(discovery);
+      this.#baseUrl = baseUrl;
+      return baseUrl;
+    })();
+
+    try {
+      return await this.#baseUrlPromise;
+    } finally {
+      this.#baseUrlPromise = undefined;
+    }
   }
 }
 

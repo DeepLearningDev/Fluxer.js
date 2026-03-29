@@ -122,9 +122,9 @@ For the narrowest real-instance smoke path in this repo, set `FLUXER_INSTANCE_UR
 npm run dev:platform
 ```
 
-For the first real bot path, add `FLUXER_KEEP_ALIVE=1` and optionally `FLUXER_BOOTSTRAP_CHANNEL_ID`, then send `!ping` in a real text channel after connect.
+For the first real bot path, add `FLUXER_KEEP_ALIVE=1` and optionally set `FLUXER_BOOTSTRAP_CHANNEL_ID` to the target channel ID, then send `!ping` in a real text channel after connect.
 
-For a stronger repeatable self-hosted or bot-gateway-capable live-instance check, set `FLUXER_CONTRACT_CHANNEL_ID` and run:
+For a stronger repeatable self-hosted or bot-gateway-capable live-instance check, set `FLUXER_CONTRACT_CHANNEL_ID` to the target channel ID and run:
 
 ```bash
 npm run dev:contract

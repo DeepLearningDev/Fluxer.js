@@ -654,7 +654,7 @@ export interface FluxerMessageAwaitOptions extends FluxerWaitForOptions<FluxerMe
   includeBots?: boolean;
 }
 
-export type FluxerCollectorStopReason = "manual" | "limit" | "timeout" | "idle" | "abort";
+export type FluxerCollectorStopReason = "manual" | "limit" | "timeout" | "idle" | "abort" | "error";
 
 export interface FluxerMessageCollectorOptions extends FluxerMessageAwaitOptions {
   max?: number;
@@ -664,6 +664,7 @@ export interface FluxerMessageCollectorOptions extends FluxerMessageAwaitOptions
 export interface FluxerMessageCollectorResult {
   collected: FluxerMessage[];
   reason: FluxerCollectorStopReason;
+  error?: Error;
 }
 
 export interface FluxerGatewayInfo {

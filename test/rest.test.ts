@@ -365,6 +365,55 @@ test("prefers api_public from discovery for bot-auth rest requests", async () =>
   assert.equal(requests[0], "https://fluxer.local/public-api/v1/users/@me");
 });
 
+test("deduplicates concurrent discovery fetches on first base-url resolution", async () => {
+  let discoveryRequests = 0;
+
+  const transport = new RestTransport({
+    instanceUrl: "https://fluxer.local",
+    fetchImpl: async (input) => {
+      const url = String(input);
+      if (url.endsWith("/v1/.well-known/fluxer")) {
+        discoveryRequests += 1;
+        return new Response(JSON.stringify({
+          api_code_version: 1,
+          endpoints: {
+            api: "https://fluxer.local/api",
+            api_client: "https://fluxer.local/client-api",
+            api_public: "https://fluxer.local/public-api",
+            gateway: "wss://fluxer.local/gateway",
+            media: "https://fluxer.local/media",
+            static_cdn: "https://fluxer.local/cdn",
+            marketing: "https://fluxer.local",
+            admin: "https://fluxer.local/admin",
+            invite: "https://fluxer.local/invite",
+            gift: "https://fluxer.local/gift",
+            webapp: "https://fluxer.local/app"
+          },
+          features: {
+            gateway_bot: true
+          }
+        }), {
+          status: 200,
+          headers: {
+            "content-type": "application/json"
+          }
+        });
+      }
+
+      return createRestCurrentUserResponse();
+    }
+  });
+
+  const [first, second] = await Promise.all([
+    transport.fetchCurrentUser(),
+    transport.fetchCurrentUser()
+  ]);
+
+  assert.equal(first.id, "bot_1");
+  assert.equal(second.id, "bot_1");
+  assert.equal(discoveryRequests, 1);
+});
+
 test("emits typed diagnostics when rest requests fail before a response", async () => {
   const transport = new RestTransport({
     baseUrl: "https://fluxer.local/api",

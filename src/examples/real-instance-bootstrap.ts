@@ -7,37 +7,11 @@ import {
   RestTransportError,
   createFluxerPlatformTransport
 } from "../index.js";
-
-function requireEnv(name: string): string {
-  const value = process.env[name];
-  if (!value || value.trim().length === 0) {
-    throw new Error(`Missing required environment variable: ${name}`);
-  }
-
-  return value.trim();
-}
-
-function parseIntents(value: string | undefined): number {
-  if (!value || value.trim().length === 0) {
-    return 513;
-  }
-
-  const parsed = Number(value);
-  if (!Number.isInteger(parsed) || parsed < 0) {
-    throw new Error("FLUXER_INTENTS must be a non-negative integer.");
-  }
-
-  return parsed;
-}
-
-function optionalEnv(name: string): string | undefined {
-  const value = process.env[name];
-  if (!value || value.trim().length === 0) {
-    return undefined;
-  }
-
-  return value.trim();
-}
+import {
+  optionalEnv,
+  parseIntegerEnv,
+  requireEnv
+} from "./example-support.js";
 
 function printUsage(): void {
   console.error("Fluxer.JS real-instance bootstrap smoke");
@@ -116,7 +90,11 @@ function printNextSteps(options: {
 async function main(): Promise<void> {
   const instanceUrl = requireEnv("FLUXER_INSTANCE_URL");
   const token = requireEnv("FLUXER_TOKEN");
-  const intents = parseIntents(process.env.FLUXER_INTENTS);
+  const intents = parseIntegerEnv(process.env.FLUXER_INTENTS, 513, {
+    name: "FLUXER_INTENTS",
+    minimum: 0,
+    descriptor: "a non-negative integer"
+  });
   const keepAlive = process.env.FLUXER_KEEP_ALIVE === "1";
   const bootstrapChannelId = optionalEnv("FLUXER_BOOTSTRAP_CHANNEL_ID");
 

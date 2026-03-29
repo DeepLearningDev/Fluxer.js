@@ -1045,16 +1045,28 @@ export class FluxerClient extends EventEmitter {
   }
 
   #parseGatewayChannel(event: FluxerGatewayDispatchEvent): FluxerChannel | null {
-    const payload = event.data as { id?: string; name?: string; type?: FluxerChannel["type"] };
-    if (!payload.id || !payload.name || !payload.type) {
+    const payload = event.data as { id?: string; name?: string | null; type?: number | string };
+    if (!payload.id || payload.type === undefined) {
       return null;
     }
 
     return {
       id: payload.id,
-      name: payload.name,
-      type: payload.type
+      name: payload.name ?? payload.id,
+      type: this.#normalizeChannelType(payload.type)
     };
+  }
+
+  #normalizeChannelType(type: number | string): FluxerChannel["type"] {
+    if (type === 1 || type === "dm") {
+      return "dm";
+    }
+
+    if (type === 3 || type === "group") {
+      return "group";
+    }
+
+    return "text";
   }
 
   #parseGatewayGuild(event: FluxerGatewayDispatchEvent): FluxerGuild | null {

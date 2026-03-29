@@ -822,6 +822,27 @@ test("collectors remove abort listeners after ending", async () => {
   assert.equal(spy.listenerCount(), 0);
 });
 
+test("collectors stop with an error result when the filter throws", async () => {
+  const transport = new MockTransport();
+  const client = new FluxerClient(transport);
+
+  await client.connect();
+
+  const collector = client.createMessageCollector({
+    channelId: "general",
+    filter: async () => {
+      throw new Error("collector-filter-failed");
+    }
+  });
+
+  await transport.injectMessage(createMessage("first"));
+  const result = await collector.wait();
+
+  assert.equal(result.reason, "error");
+  assert.equal(result.error?.message, "collector-filter-failed");
+  assert.equal(collector.ended, true);
+});
+
 test("waitForMessage ignores bot messages by default and can opt in", async () => {
   const transport = new MockTransport();
   const client = new FluxerClient(transport);
@@ -1153,6 +1174,59 @@ test("rejects async module setup through module()", () => {
       setup: async () => {}
     });
   }, /Use installModule\(\)/);
+  assert.deepEqual(bot.modules, []);
+});
+
+test("rolls back sync registration when module() rejects async setup", () => {
+  const bot = new FluxerBot({
+    name: "TestBot",
+    prefix: "!"
+  });
+
+  assert.throws(() => {
+    bot.module({
+      name: "async-module",
+      commands: [
+        {
+          name: "ping",
+          execute: async () => {}
+        }
+      ],
+      setup: async () => {}
+    });
+  }, /Use installModule\(\)/);
+
+  assert.deepEqual(bot.modules, []);
+  assert.equal(bot.hasCommand("ping"), false);
+});
+
+test("rolls back plugin registration when plugin() rejects async setup", () => {
+  const bot = new FluxerBot({
+    name: "TestBot",
+    prefix: "!"
+  });
+
+  assert.throws(() => {
+    bot.plugin({
+      name: "async-plugin",
+      modules: [
+        {
+          name: "plugin-module",
+          commands: [
+            {
+              name: "ping",
+              execute: async () => {}
+            }
+          ]
+        }
+      ],
+      setup: async () => {}
+    });
+  }, /Use installPlugin\(\)/);
+
+  assert.deepEqual(bot.plugins, []);
+  assert.deepEqual(bot.modules, []);
+  assert.equal(bot.hasCommand("ping"), false);
 });
 
 test("builds rich message payloads with embeds", () => {

@@ -105,11 +105,19 @@ export class FluxerBot {
       return this;
     }
 
-    const setupResult = this.#applyModule(module);
-    if (module.setup && this.#isPromiseLike(setupResult)) {
-      throw new Error(
-        `Module "${module.name}" has async setup. Use installModule() instead of module().`
-      );
+    const snapshot = this.#createStateSnapshot();
+
+    try {
+      const setupResult = this.#applyModule(module);
+      if (module.setup && this.#isPromiseLike(setupResult)) {
+        this.#restoreStateSnapshot(snapshot);
+        throw new Error(
+          `Module "${module.name}" has async setup. Use installModule() instead of module().`
+        );
+      }
+    } catch (error) {
+      this.#restoreStateSnapshot(snapshot);
+      throw error;
     }
 
     return this;
@@ -155,20 +163,29 @@ export class FluxerBot {
       return this;
     }
 
-    for (const module of plugin.modules ?? []) {
-      this.module(module);
-    }
+    const snapshot = this.#createStateSnapshot();
 
-    if (plugin.setup) {
-      const result = plugin.setup({ bot: this });
-      if (this.#isPromiseLike(result)) {
-        throw new Error(
-          `Plugin "${plugin.name}" has async setup. Use installPlugin() instead of plugin().`
-        );
+    try {
+      for (const module of plugin.modules ?? []) {
+        this.module(module);
       }
+
+      if (plugin.setup) {
+        const result = plugin.setup({ bot: this });
+        if (this.#isPromiseLike(result)) {
+          this.#restoreStateSnapshot(snapshot);
+          throw new Error(
+            `Plugin "${plugin.name}" has async setup. Use installPlugin() instead of plugin().`
+          );
+        }
+      }
+
+      this.#plugins.add(plugin.name);
+    } catch (error) {
+      this.#restoreStateSnapshot(snapshot);
+      throw error;
     }
 
-    this.#plugins.add(plugin.name);
     return this;
   }
 
@@ -637,6 +654,36 @@ export class FluxerBot {
 
   #isPromiseLike(value: unknown): value is Promise<unknown> {
     return typeof value === "object" && value !== null && "then" in value;
+  }
+
+  #createStateSnapshot() {
+    return {
+      commands: new Map(this.#commands),
+      commandGroups: new Map(this.#commandGroups),
+      guards: [...this.#guards],
+      middleware: [...this.#middleware],
+      hookSets: [...this.#hookSets],
+      modules: new Set(this.#modules),
+      plugins: new Set(this.#plugins)
+    };
+  }
+
+  #restoreStateSnapshot(snapshot: {
+    commands: Map<string, AnyCommand>;
+    commandGroups: Map<string, AnyCommandGroup>;
+    guards: FluxerCommandGuard[];
+    middleware: FluxerCommandMiddleware[];
+    hookSets: FluxerCommandExecutionHooks[];
+    modules: Set<string>;
+    plugins: Set<string>;
+  }): void {
+    this.#commands = new Map(snapshot.commands);
+    this.#commandGroups = new Map(snapshot.commandGroups);
+    this.#guards = [...snapshot.guards];
+    this.#middleware = [...snapshot.middleware];
+    this.#hookSets = [...snapshot.hookSets];
+    this.#modules = new Set(snapshot.modules);
+    this.#plugins = new Set(snapshot.plugins);
   }
 
   #emitDebug(event: {

@@ -31,7 +31,11 @@ export class FluxerMessageCollector extends EventEmitter {
     this.#client = client;
     this.#options = options;
     this.#listener = async (message) => {
-      await this.#handleMessage(message);
+      try {
+        await this.#handleMessage(message);
+      } catch (error) {
+        this.stop("error", normalizeCollectorError(error));
+      }
     };
     this.#resultPromise = new Promise<FluxerMessageCollectorResult>((resolve) => {
       this.#resolveEnd = resolve;
@@ -62,11 +66,12 @@ export class FluxerMessageCollector extends EventEmitter {
     return this.#ended;
   }
 
-  public stop(reason: FluxerCollectorStopReason = "manual"): FluxerMessageCollectorResult {
+  public stop(reason: FluxerCollectorStopReason = "manual", error?: Error): FluxerMessageCollectorResult {
     if (this.#ended) {
       return {
         collected: this.collected,
-        reason
+        reason,
+        ...(error ? { error } : {})
       };
     }
 
@@ -79,7 +84,8 @@ export class FluxerMessageCollector extends EventEmitter {
 
     const result = {
       collected: this.collected,
-      reason
+      reason,
+      ...(error ? { error } : {})
     };
     this.emit("end", result);
     this.#resolveEnd(result);
@@ -236,5 +242,16 @@ function createWaitForAbortError(eventName: EventKey): FluxerError {
   return new FluxerError(
     `Waiting for event "${String(eventName)}" was aborted.`,
     "WAIT_FOR_ABORTED"
+  );
+}
+
+function normalizeCollectorError(error: unknown): Error {
+  if (error instanceof Error) {
+    return error;
+  }
+
+  return new FluxerError(
+    "Message collector failed while evaluating a message filter.",
+    "COLLECTOR_FILTER_FAILED"
   );
 }

@@ -2,7 +2,7 @@
 
 This is the honest hosted-platform confidence path in the repo.
 
-Use it when the official hosted Fluxer API is your target and the stronger bot-runtime harness is not available because the hosted platform does not advertise `gatewayBot`.
+Use it when the official hosted Fluxer API is your target and the stronger bot-runtime harness is not available on the target instance because `gatewayBot` is not advertised.
 
 ## What It Proves
 
@@ -25,8 +25,10 @@ This is intentionally narrower than the self-hosted live contract harness becaus
 ```bash
 export FLUXER_INSTANCE_URL="https://api.fluxer.app"
 export FLUXER_TOKEN="your-token"
-export FLUXER_CONTRACT_CHANNEL_ID="general"
+export FLUXER_CONTRACT_CHANNEL_ID="<your-channel-id>"
 ```
+
+`FLUXER_CONTRACT_CHANNEL_ID` should be the channel ID, not the display name.
 
 The hosted path also auto-loads these files automatically when present:
 

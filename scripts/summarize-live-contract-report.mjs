@@ -13,12 +13,13 @@ if (!inputArg) {
 const inputPath = path.resolve(processRef.cwd(), inputArg);
 const raw = await readFile(inputPath, "utf8");
 const report = JSON.parse(raw);
+const mode = String(report.mode ?? "contract");
 const summary = renderSummary(report, inputPath);
 
 if (outputArg) {
   const outputPath = path.resolve(processRef.cwd(), outputArg);
   await writeFile(outputPath, summary, "utf8");
-  consoleRef.log(`Contract summary written to ${outputPath}`);
+  consoleRef.log(`${summaryLabel(mode)} written to ${outputPath}`);
 } else {
   processRef.stdout.write(summary);
 }
@@ -38,9 +39,12 @@ function renderSummary(report, inputPath) {
     `- Source report: \`${inputPath}\``,
     `- Instance: ${String(report.instanceUrl ?? "unknown")}`,
     `- Channel: ${String(report.channelId ?? "unknown")}`,
-    `- Keep alive: ${report.keepAlive === true ? "yes" : "no"}`,
     ""
   ];
+
+  if (mode !== "hosted-confidence" && report.keepAlive !== undefined) {
+    lines.splice(lines.length - 1, 0, `- Keep alive: ${report.keepAlive === true ? "yes" : "no"}`);
+  }
 
   if (report.instance) {
     lines.push("## Instance", "");
@@ -127,4 +131,10 @@ function renderSummary(report, inputPath) {
   }
 
   return lines.join("\n") + "\n";
+}
+
+function summaryLabel(mode) {
+  return mode === "hosted-confidence"
+    ? "Hosted confidence summary"
+    : "Contract summary";
 }

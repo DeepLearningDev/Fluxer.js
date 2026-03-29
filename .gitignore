@@ -6,3 +6,4 @@ src/**/*.js
 test/**/*.js
 test/**/*.d.ts
 test/**/*.d.ts.map
+.tmp-*-report.*

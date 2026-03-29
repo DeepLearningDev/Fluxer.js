@@ -1,7 +1,4 @@
-import { mkdir, writeFile } from "node:fs/promises";
-import path from "node:path";
 import process from "node:process";
-import { existsSync, readFileSync } from "node:fs";
 import {
   DiscoveryError,
   FluxerClient,
@@ -15,6 +12,14 @@ import {
   defaultParseMessageEvent,
   fetchInstanceDiscoveryDocument
 } from "../index.js";
+import {
+  loadExampleEnvFiles,
+  optionalEnvFromNames,
+  parseIntegerEnv,
+  requireEnv,
+  sleep,
+  writeReportIfConfigured as writeExampleReportIfConfigured
+} from "./example-support.js";
 
 type ConfidenceStepStatus = "started" | "passed" | "failed";
 
@@ -79,105 +84,6 @@ interface HostedConfidenceReport {
 }
 
 let currentReport: HostedConfidenceReport | undefined;
-
-function loadEnvFiles(): string[] {
-  const candidates = [
-    ".env.contract.local",
-    ".env.contract",
-    ".env.local",
-    ".env"
-  ];
-  const loaded: string[] = [];
-
-  for (const candidate of candidates) {
-    const fullPath = path.resolve(process.cwd(), candidate);
-    if (!existsSync(fullPath)) {
-      continue;
-    }
-
-    const fileContent = readFileSync(fullPath, "utf8");
-    for (const line of fileContent.split(/\r?\n/)) {
-      const trimmed = line.trim();
-      if (trimmed.length === 0 || trimmed.startsWith("#")) {
-        continue;
-      }
-
-      const separatorIndex = trimmed.indexOf("=");
-      if (separatorIndex <= 0) {
-        continue;
-      }
-
-      const key = trimmed.slice(0, separatorIndex).trim();
-      const rawValue = trimmed.slice(separatorIndex + 1).trim();
-      if (!key || process.env[key] !== undefined) {
-        continue;
-      }
-
-      process.env[key] = normalizeEnvValue(rawValue);
-    }
-
-    loaded.push(candidate);
-  }
-
-  return loaded;
-}
-
-function normalizeEnvValue(value: string): string {
-  if (
-    (value.startsWith("\"") && value.endsWith("\""))
-    || (value.startsWith("'") && value.endsWith("'"))
-  ) {
-    return value.slice(1, -1);
-  }
-
-  return value;
-}
-
-function requireEnv(name: string): string {
-  const value = process.env[name];
-  if (!value || value.trim().length === 0) {
-    throw new Error(`Missing required environment variable: ${name}`);
-  }
-
-  return value.trim();
-}
-
-function optionalEnv(name: string): string | undefined {
-  const value = process.env[name];
-  if (!value || value.trim().length === 0) {
-    return undefined;
-  }
-
-  return value.trim();
-}
-
-function optionalEnvFromNames(names: string[]): string | undefined {
-  for (const name of names) {
-    const value = optionalEnv(name);
-    if (value !== undefined) {
-      return value;
-    }
-  }
-
-  return undefined;
-}
-
-function parsePositiveInt(value: string | undefined, fallback: number, name: string): number {
-  if (!value) {
-    return fallback;
-  }
-
-  const parsed = Number(value);
-  if (!Number.isInteger(parsed) || parsed <= 0) {
-    throw new Error(`${name} must be a positive integer.`);
-  }
-
-  return parsed;
-}
-
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
-}
 
 function printUsage(): void {
   console.error("Fluxer.JS hosted-instance confidence path");
@@ -284,17 +190,6 @@ function createErrorRecord(error: DiscoveryError | GatewayTransportError | RestT
   };
 }
 
-async function writeReportIfConfigured(report: HostedConfidenceReport): Promise<void> {
-  if (!report.reportPath) {
-    return;
-  }
-
-  const outputPath = path.resolve(process.cwd(), report.reportPath);
-  await mkdir(path.dirname(outputPath), { recursive: true });
-  await writeFile(outputPath, JSON.stringify(report, null, 2) + "\n", "utf8");
-  console.log(`Hosted confidence report written to ${outputPath}`);
-}
-
 async function waitForProbeEcho(options: {
   client: FluxerClient;
   channelId: string;
@@ -358,19 +253,27 @@ function resolveHostedGatewayUrl(baseUrl: string, apiCodeVersion: number): strin
 }
 
 async function main(): Promise<void> {
-  const loadedEnvFiles = loadEnvFiles();
+  const loadedEnvFiles = loadExampleEnvFiles();
   const instanceUrl = requireEnv("FLUXER_INSTANCE_URL");
   const token = requireEnv("FLUXER_TOKEN");
   const channelId = requireEnv("FLUXER_CONTRACT_CHANNEL_ID");
-  const listLimit = parsePositiveInt(
+  const listLimit = parseIntegerEnv(
     optionalEnvFromNames(["FLUXER_HOSTED_LIST_LIMIT", "FLUXER_CONTRACT_LIST_LIMIT"]),
     10,
-    "FLUXER_HOSTED_LIST_LIMIT"
+    {
+      name: "FLUXER_HOSTED_LIST_LIMIT",
+      minimum: 1,
+      descriptor: "a positive integer"
+    }
   );
-  const timeoutMs = parsePositiveInt(
+  const timeoutMs = parseIntegerEnv(
     optionalEnvFromNames(["FLUXER_HOSTED_TIMEOUT_MS", "FLUXER_CONTRACT_TIMEOUT_MS"]),
     5000,
-    "FLUXER_HOSTED_TIMEOUT_MS"
+    {
+      name: "FLUXER_HOSTED_TIMEOUT_MS",
+      minimum: 1,
+      descriptor: "a positive integer"
+    }
   );
   const probePrefix = optionalEnvFromNames(["FLUXER_HOSTED_MESSAGE_PREFIX", "FLUXER_CONTRACT_MESSAGE_PREFIX"])
     ?? "Fluxer.JS hosted confidence probe";
@@ -665,7 +568,7 @@ async function main(): Promise<void> {
   recordStep(report, "disconnect", "passed");
   report.status = "passed";
   report.finishedAt = new Date().toISOString();
-  await writeReportIfConfigured(report);
+  await writeExampleReportIfConfigured(report, "Hosted confidence");
   console.log("Hosted confidence path passed.");
 }
 
@@ -678,7 +581,7 @@ main().catch(async (error) => {
       recordStep(currentReport, "failed", "failed", {
         code: error.code
       });
-      await writeReportIfConfigured(currentReport);
+      await writeExampleReportIfConfigured(currentReport, "Hosted confidence");
     }
     printTypedError(error);
     printTroubleshootingHint(error);
@@ -694,7 +597,7 @@ main().catch(async (error) => {
       recordStep(currentReport, "failed", "failed", {
         message: error.message
       });
-      await writeReportIfConfigured(currentReport);
+      await writeExampleReportIfConfigured(currentReport, "Hosted confidence");
     }
     console.error(error.message);
     printTroubleshootingHint(error);

@@ -46,10 +46,10 @@ Optional:
 
 ```bash
 export FLUXER_INTENTS="513"
-export FLUXER_BOOTSTRAP_CHANNEL_ID="general"
+export FLUXER_BOOTSTRAP_CHANNEL_ID="<your-channel-id>"
 ```
 
-`FLUXER_BOOTSTRAP_CHANNEL_ID` is useful when you want the script to send one startup message after connect so you can verify outbound REST and channel access immediately.
+`FLUXER_BOOTSTRAP_CHANNEL_ID` is useful when you want the script to send one startup message after connect so you can verify outbound REST and channel access immediately. Use the channel ID, not the visible channel name.
 
 ## 3. Run The Bot
 

@@ -867,6 +867,63 @@ test("maps member, presence, typing, and user gateway events", async () => {
   ]);
 });
 
+test("maps channel gateway events with numeric channel types", async () => {
+  const transport = new MockTransport();
+  const client = new FluxerClient(transport);
+  const events: string[] = [];
+
+  client.on("channelCreate", (channel) => {
+    events.push(`create:${channel.id}:${channel.type}:${channel.name}`);
+  });
+
+  client.on("channelUpdate", (channel) => {
+    events.push(`update:${channel.id}:${channel.type}:${channel.name}`);
+  });
+
+  await client.receiveGatewayDispatch({
+    type: "CHANNEL_CREATE",
+    sequence: 6,
+    data: {
+      id: "channel_text",
+      name: "general",
+      type: 0
+    },
+    raw: {
+      op: 0,
+      d: {
+        id: "channel_text",
+        name: "general",
+        type: 0
+      },
+      s: 6,
+      t: "CHANNEL_CREATE"
+    }
+  });
+
+  await client.receiveGatewayDispatch({
+    type: "CHANNEL_UPDATE",
+    sequence: 7,
+    data: {
+      id: "channel_dm",
+      type: 1
+    },
+    raw: {
+      op: 0,
+      d: {
+        id: "channel_dm",
+        type: 1
+      },
+      s: 7,
+      t: "CHANNEL_UPDATE"
+    }
+  });
+
+  assert.deepEqual(events, [
+    "create:channel_text:text:general",
+    "update:channel_dm:dm:channel_dm"
+  ]);
+});
+
 test("maps role, reaction, and voice gateway events", async () => {
   const transport = new MockTransport();
   const client = new FluxerClient(transport);
@@ -1665,6 +1722,8 @@ test("emits typed diagnostics when identify payload cannot be built", async () =
     hasIdentifyBuilder: false,
     hasAuth: false
   });
+  await flushAsyncWork();
+  assert.equal(sockets.length, 1);
 });
 
 test("emits typed diagnostics when reconnect attempts are exhausted", async () => {

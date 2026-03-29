@@ -21,8 +21,10 @@ This is stronger than the first bootstrap smoke, but it is still not a full live
 ```bash
 export FLUXER_INSTANCE_URL="https://your-self-hosted-fluxer-api"
 export FLUXER_TOKEN="your-token"
-export FLUXER_CONTRACT_CHANNEL_ID="general"
+export FLUXER_CONTRACT_CHANNEL_ID="<your-channel-id>"
 ```
+
+`FLUXER_CONTRACT_CHANNEL_ID` should be the channel ID, not the display name.
 
 The harness also loads these files automatically when present:
 

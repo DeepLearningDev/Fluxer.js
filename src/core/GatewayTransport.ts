@@ -37,6 +37,7 @@ export class GatewayTransport extends BaseTransport {
   };
   #socket?: WebSocket;
   #manualClose = false;
+  #suppressReconnect = false;
   #reconnectAttempts = 0;
   #reconnectTimer?: ReturnType<typeof setTimeout>;
   #heartbeatTimer?: ReturnType<typeof setInterval>;
@@ -58,12 +59,14 @@ export class GatewayTransport extends BaseTransport {
 
   public async connect(): Promise<void> {
     this.#manualClose = false;
+    this.#suppressReconnect = false;
     await this.#setState("connecting");
     await this.#openSocket();
   }
 
   public async disconnect(): Promise<void> {
     this.#manualClose = true;
+    this.#suppressReconnect = false;
 
     if (this.#reconnectTimer) {
       clearTimeout(this.#reconnectTimer);
@@ -116,6 +119,7 @@ export class GatewayTransport extends BaseTransport {
       socket.addEventListener("open", () => {
         settled = true;
         this.#reconnectAttempts = 0;
+        this.#suppressReconnect = false;
         void this.#setState("connected");
         void this.#emitDebugEvent("socket_open", {
           reconnectAttempts: this.#reconnectAttempts
@@ -169,7 +173,7 @@ export class GatewayTransport extends BaseTransport {
           return;
         }
 
-        if (!this.#manualClose) {
+        if (!this.#manualClose && !this.#suppressReconnect) {
           await this.emitError(
             new GatewayTransportError({
               message: "GatewayTransport disconnected unexpectedly.",
@@ -191,6 +195,7 @@ export class GatewayTransport extends BaseTransport {
           await this.#setState("reconnecting", "socket_close");
           this.#scheduleReconnect();
         } else {
+          this.#suppressReconnect = false;
           await this.#setState("disconnected", "socket_close");
         }
       });
@@ -471,6 +476,7 @@ export class GatewayTransport extends BaseTransport {
     });
 
     if (payload === undefined) {
+      this.#suppressReconnect = true;
       void this.emitError(
         new GatewayTransportError({
           message: "GatewayTransport could not build an identify payload.",

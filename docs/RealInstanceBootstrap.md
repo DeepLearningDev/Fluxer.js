@@ -27,8 +27,10 @@ Optional:
 ```bash
 export FLUXER_INTENTS="513"
 export FLUXER_KEEP_ALIVE="1"
-export FLUXER_BOOTSTRAP_CHANNEL_ID="general"
+export FLUXER_BOOTSTRAP_CHANNEL_ID="<your-channel-id>"
 ```
+
+`FLUXER_BOOTSTRAP_CHANNEL_ID` should be the channel ID, not the display name.
 
 Then run:
 

@@ -1,12 +1,18 @@
-import { FluxerBot } from "./core/Bot.js";
-import { AttachmentBuilder, EmbedBuilder, MessageBuilder } from "./core/builders.js";
-import { defineCommand, defineCommandGroup } from "./core/CommandSchema.js";
-import { FluxerClient } from "./core/Client.js";
-import { attachDebugHandler, createConsoleDebugHandler } from "./core/Diagnostics.js";
-import { MockTransport } from "./core/MockTransport.js";
-import { createPermissionGuard } from "./core/Permissions.js";
-import type { CommandContext, FluxerModule } from "./core/types.js";
-import { createEssentialsPlugin } from "./plugins/essentials.js";
+import {
+  AttachmentBuilder,
+  EmbedBuilder,
+  FluxerBot,
+  FluxerClient,
+  MessageBuilder,
+  MockTransport,
+  attachDebugHandler,
+  createConsoleDebugHandler,
+  createEssentialsPlugin,
+  createPermissionGuard,
+  defineCommand,
+  defineCommandGroup
+} from "./index.js";
+import type { CommandContext, FluxerModule } from "./index.js";
 
 const transport = new MockTransport();
 const client = new FluxerClient(transport);
