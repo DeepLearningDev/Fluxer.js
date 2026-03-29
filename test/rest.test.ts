@@ -36,6 +36,23 @@ function createRestMessageResponse(overrides: Partial<{
   });
 }
 
+function createRateLimitedResponse(options: {
+  body?: Record<string, unknown>;
+  headers?: Record<string, string>;
+} = {}): Response {
+  return new Response(
+    options.body ? JSON.stringify(options.body) : null,
+    {
+      status: 429,
+      statusText: "Too Many Requests",
+      headers: {
+        ...(options.body ? { "content-type": "application/json" } : {}),
+        ...options.headers
+      }
+    }
+  );
+}
+
 function createRestChannelResponse(overrides: Partial<{
   id: string;
   name: string | null;
@@ -614,6 +631,224 @@ test("fetches, edits, and deletes messages through rest transport lifecycle endp
     ]
   );
   assert.equal(requests[1]?.body, JSON.stringify({ content: "updated" }));
+});
+
+test("surfaces rate-limit metadata across message lifecycle endpoints", async () => {
+  const scenarios = [
+    {
+      name: "listMessages",
+      invoke: (transport: RestTransport) => transport.listMessages("general"),
+      response: () =>
+        createRateLimitedResponse({
+          body: {
+            global: false
+          },
+          headers: {
+            "x-ratelimit-reset-after": "1.5",
+            "x-ratelimit-bucket": "messages:general"
+          }
+        }),
+      expected: {
+        method: "GET",
+        url: "https://fluxer.local/api/v1/channels/general/messages",
+        retryAfterMs: 1500,
+        retryAfterSource: "reset_after",
+        global: false
+      }
+    },
+    {
+      name: "fetchMessage",
+      invoke: (transport: RestTransport) => transport.fetchMessage("general", "msg_1"),
+      response: () =>
+        createRateLimitedResponse({
+          body: {
+            retry_after_ms: 1200,
+            global: true
+          }
+        }),
+      expected: {
+        method: "GET",
+        url: "https://fluxer.local/api/v1/channels/general/messages/msg_1",
+        messageId: "msg_1",
+        retryAfterMs: 1200,
+        retryAfterSource: "body",
+        global: true
+      }
+    },
+    {
+      name: "editMessage",
+      invoke: (transport: RestTransport) => transport.editMessage("general", "msg_1", {
+        content: "updated"
+      }),
+      response: () =>
+        createRateLimitedResponse({
+          body: {
+            retry_after: 1.5
+          },
+          headers: {
+            "retry-after": "2"
+          }
+        }),
+      expected: {
+        method: "PATCH",
+        url: "https://fluxer.local/api/v1/channels/general/messages/msg_1",
+        messageId: "msg_1",
+        retryAfterMs: 2000,
+        retryAfterSource: "header"
+      }
+    },
+    {
+      name: "deleteMessage",
+      invoke: (transport: RestTransport) => transport.deleteMessage("general", "msg_1"),
+      response: () =>
+        createRateLimitedResponse({
+          headers: {
+            "x-ratelimit-reset-after": "0.25"
+          }
+        }),
+      expected: {
+        method: "DELETE",
+        url: "https://fluxer.local/api/v1/channels/general/messages/msg_1",
+        messageId: "msg_1",
+        retryAfterMs: 250,
+        retryAfterSource: "reset_after"
+      }
+    }
+  ] as const;
+
+  for (const scenario of scenarios) {
+    const transport = new RestTransport({
+      baseUrl: "https://fluxer.local/api",
+      fetchImpl: async () => scenario.response()
+    });
+
+    await assert.rejects(async () => {
+      await scenario.invoke(transport);
+    }, (error: unknown) => {
+      assert.ok(error instanceof RestTransportError, `${scenario.name} should reject with RestTransportError`);
+      assert.equal(error.code, "REST_RATE_LIMITED");
+      assert.equal(error.status, 429);
+      assert.equal(error.retryable, true);
+      assert.equal(error.retryAfterMs, scenario.expected.retryAfterMs);
+      assert.equal(error.details?.method, scenario.expected.method);
+      assert.equal(error.details?.url, scenario.expected.url);
+      assert.equal(error.details?.channelId, "general");
+      assert.equal(
+        error.details?.messageId,
+        "messageId" in scenario.expected ? scenario.expected.messageId : undefined
+      );
+      assert.equal(error.details?.retryAfterMs, scenario.expected.retryAfterMs);
+      assert.equal(error.details?.retryAfterSource, scenario.expected.retryAfterSource);
+      assert.equal(
+        error.details?.global,
+        "global" in scenario.expected ? scenario.expected.global : undefined
+      );
+      return true;
+    });
+  }
+});
+
+test("rejects invalid message lifecycle responses from rest transport", async () => {
+  const scenarios = [
+    {
+      name: "listMessages",
+      invoke: (transport: RestTransport) => transport.listMessages("general"),
+      response: () =>
+        new Response(JSON.stringify([
+          {
+            id: "msg_1",
+            content: "hello",
+            channel_id: "general",
+            timestamp: "2026-03-18T22:00:00.000Z",
+            author: {
+              id: "user_1"
+            }
+          }
+        ]), {
+          status: 200,
+          headers: {
+            "content-type": "application/json"
+          }
+        }),
+      expected: {
+        method: "GET",
+        url: "https://fluxer.local/api/v1/channels/general/messages",
+        messageId: "msg_1"
+      }
+    },
+    {
+      name: "fetchMessage",
+      invoke: (transport: RestTransport) => transport.fetchMessage("general", "msg_1"),
+      response: () =>
+        new Response(JSON.stringify({
+          id: "msg_1",
+          content: "hello",
+          channel_id: "general",
+          timestamp: "2026-03-18T22:00:00.000Z",
+          author: {
+            id: "user_1"
+          }
+        }), {
+          status: 200,
+          headers: {
+            "content-type": "application/json"
+          }
+        }),
+      expected: {
+        method: "GET",
+        url: "https://fluxer.local/api/v1/channels/general/messages/msg_1",
+        messageId: "msg_1"
+      }
+    },
+    {
+      name: "editMessage",
+      invoke: (transport: RestTransport) => transport.editMessage("general", "msg_1", {
+        content: "updated"
+      }),
+      response: () =>
+        new Response(JSON.stringify({
+          id: "msg_1",
+          content: "updated",
+          channel_id: "general",
+          timestamp: "2026-03-18T22:00:00.000Z",
+          author: {
+            id: "user_1"
+          }
+        }), {
+          status: 200,
+          headers: {
+            "content-type": "application/json"
+          }
+        }),
+      expected: {
+        method: "PATCH",
+        url: "https://fluxer.local/api/v1/channels/general/messages/msg_1",
+        messageId: "msg_1"
+      }
+    }
+  ] as const;
+
+  for (const scenario of scenarios) {
+    const transport = new RestTransport({
+      baseUrl: "https://fluxer.local/api",
+      fetchImpl: async () => scenario.response()
+    });
+
+    await assert.rejects(async () => {
+      await scenario.invoke(transport);
+    }, (error: unknown) => {
+      assert.ok(error instanceof RestTransportError, `${scenario.name} should reject with RestTransportError`);
+      assert.equal(error.code, "REST_RESPONSE_INVALID");
+      assert.equal(error.details?.method, scenario.expected.method);
+      assert.equal(error.details?.url, scenario.expected.url);
+      assert.equal(error.details?.channelId, "general");
+      assert.equal(
+        error.details?.messageId,
+        "messageId" in scenario.expected ? scenario.expected.messageId : undefined
+      );
+      return true;
+    });
+  }
 });
 
 test("fetches channels through rest transport and normalizes channel type", async () => {
