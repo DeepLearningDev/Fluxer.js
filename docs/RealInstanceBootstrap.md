@@ -2,7 +2,7 @@
 
 This is the narrowest honest path for checking Fluxer.JS against a real Fluxer instance.
 
-## What It Proves
+## What It Checks
 
 - discovery succeeds
 - gateway bootstrap succeeds

@@ -130,6 +130,8 @@ For a stronger repeatable live-instance check, set `FLUXER_CONTRACT_CHANNEL_ID` 
 npm run dev:contract
 ```
 
+Set `FLUXER_CONTRACT_REPORT_PATH` as well if you want the harness to write a JSON report artifact for the run.
+
 That example lives in `src/examples/real-instance-bootstrap.ts` and `src/examples/live-instance-contract.ts` and is documented in [docs/RealInstanceBootstrap.md](./docs/RealInstanceBootstrap.md), [docs/FirstRealBot.md](./docs/FirstRealBot.md), and [docs/LiveInstanceContractHarness.md](./docs/LiveInstanceContractHarness.md). It is meant to prove a narrow live contract layer, not to stand in for a full live contract matrix.
 
 ## What You Get Today

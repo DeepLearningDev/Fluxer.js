@@ -32,6 +32,7 @@ export FLUXER_CONTRACT_LIST_LIMIT="10"
 export FLUXER_CONTRACT_TIMEOUT_MS="5000"
 export FLUXER_CONTRACT_MESSAGE_PREFIX="Fluxer.JS live contract probe"
 export FLUXER_KEEP_ALIVE="1"
+export FLUXER_CONTRACT_REPORT_PATH="./artifacts/live-contract-report.json"
 ```
 
 ## Run It
@@ -50,6 +51,14 @@ If the harness succeeds, it will:
 - verify that the same probe appears in recent channel history
 
 If `FLUXER_KEEP_ALIVE=1`, the harness stays connected after the probe and tells you to send `!ping` for a manual reply check.
+
+If `FLUXER_CONTRACT_REPORT_PATH` is set, the harness also writes a JSON report with:
+
+- run timestamps
+- step-by-step pass/fail status
+- current bot identity
+- probe content and confirmed message ID
+- typed failure metadata when the run fails
 
 ## Failure Shape
 

@@ -1,3 +1,5 @@
+import { mkdir, writeFile } from "node:fs/promises";
+import path from "node:path";
 import process from "node:process";
 import {
   FluxerBot,
@@ -7,6 +9,44 @@ import {
   RestTransportError,
   createFluxerPlatformTransport
 } from "../index.js";
+
+type ContractStepStatus = "started" | "passed" | "failed";
+
+interface ContractStepRecord {
+  name: string;
+  status: ContractStepStatus;
+  timestamp: string;
+  details?: Record<string, unknown>;
+}
+
+interface ContractRunReport {
+  startedAt: string;
+  finishedAt?: string;
+  status: "running" | "passed" | "failed";
+  instanceUrl?: string;
+  channelId?: string;
+  keepAlive: boolean;
+  listLimit: number;
+  timeoutMs: number;
+  reportPath?: string;
+  currentUser?: {
+    id: string;
+    username: string;
+  };
+  probe?: {
+    content: string;
+    confirmedMessageId?: string;
+  };
+  steps: ContractStepRecord[];
+  error?: {
+    name: string;
+    message: string;
+    code?: string;
+    details?: Record<string, unknown>;
+  };
+}
+
+let currentReport: ContractRunReport | undefined;
 
 function requireEnv(name: string): string {
   const value = process.env[name];
@@ -56,6 +96,7 @@ function printUsage(): void {
   console.error("- FLUXER_CONTRACT_TIMEOUT_MS (default: 5000)");
   console.error("- FLUXER_CONTRACT_MESSAGE_PREFIX (default: Fluxer.JS live contract probe)");
   console.error("- FLUXER_KEEP_ALIVE=1 to keep the bot connected for a real !ping check after the contract probe");
+  console.error("- FLUXER_CONTRACT_REPORT_PATH to write a JSON contract run report");
 }
 
 function printTroubleshootingHint(
@@ -104,6 +145,70 @@ function printTypedError(error: PlatformBootstrapError | GatewayTransportError |
   }
 }
 
+function recordStep(
+  report: ContractRunReport,
+  name: string,
+  status: ContractStepStatus,
+  details?: Record<string, unknown>
+): void {
+  report.steps.push({
+    name,
+    status,
+    timestamp: new Date().toISOString(),
+    details
+  });
+}
+
+function createRunReport(options: {
+  instanceUrl?: string;
+  channelId?: string;
+  keepAlive: boolean;
+  listLimit: number;
+  timeoutMs: number;
+  reportPath?: string;
+}): ContractRunReport {
+  return {
+    startedAt: new Date().toISOString(),
+    status: "running",
+    instanceUrl: options.instanceUrl,
+    channelId: options.channelId,
+    keepAlive: options.keepAlive,
+    listLimit: options.listLimit,
+    timeoutMs: options.timeoutMs,
+    reportPath: options.reportPath,
+    steps: []
+  };
+}
+
+function createErrorRecord(
+  error: PlatformBootstrapError | GatewayTransportError | RestTransportError | Error
+): ContractRunReport["error"] {
+  if (error instanceof PlatformBootstrapError || error instanceof GatewayTransportError || error instanceof RestTransportError) {
+    return {
+      name: error.name,
+      message: error.message,
+      code: error.code,
+      details: error.details
+    };
+  }
+
+  return {
+    name: error.name,
+    message: error.message
+  };
+}
+
+async function writeReportIfConfigured(report: ContractRunReport): Promise<void> {
+  if (!report.reportPath) {
+    return;
+  }
+
+  const outputPath = path.resolve(process.cwd(), report.reportPath);
+  await mkdir(path.dirname(outputPath), { recursive: true });
+  await writeFile(outputPath, JSON.stringify(report, null, 2) + "\n", "utf8");
+  console.log(`Contract report written to ${outputPath}`);
+}
+
 async function waitForProbeEcho(options: {
   client: FluxerClient;
   channelId: string;
@@ -111,7 +216,7 @@ async function waitForProbeEcho(options: {
   currentUserId: string;
   limit: number;
   timeoutMs: number;
-}): Promise<void> {
+}): Promise<string> {
   const startedAt = Date.now();
 
   while (Date.now() - startedAt < options.timeoutMs) {
@@ -126,7 +231,7 @@ async function waitForProbeEcho(options: {
 
     if (match) {
       console.log(`Probe confirmed in channel history: ${match.id}`);
-      return;
+      return match.id;
     }
 
     await sleep(500);
@@ -144,6 +249,16 @@ async function main(): Promise<void> {
   const timeoutMs = parseIntEnv("FLUXER_CONTRACT_TIMEOUT_MS", 5000);
   const keepAlive = process.env.FLUXER_KEEP_ALIVE === "1";
   const probePrefix = optionalEnv("FLUXER_CONTRACT_MESSAGE_PREFIX") ?? "Fluxer.JS live contract probe";
+  const reportPath = optionalEnv("FLUXER_CONTRACT_REPORT_PATH");
+  const report = createRunReport({
+    instanceUrl,
+    channelId,
+    keepAlive,
+    listLimit,
+    timeoutMs,
+    reportPath
+  });
+  currentReport = report;
 
   const transport = await createFluxerPlatformTransport({
     instanceUrl,
@@ -193,22 +308,63 @@ async function main(): Promise<void> {
   });
 
   client.registerBot(bot);
+  recordStep(report, "connect", "started");
   await client.connect();
+  recordStep(report, "connect", "passed");
 
+  recordStep(report, "fetch_current_user", "started");
   const currentUser = await client.fetchCurrentUser();
+  report.currentUser = {
+    id: currentUser.id,
+    username: currentUser.username
+  };
+  recordStep(report, "fetch_current_user", "passed", {
+    userId: currentUser.id,
+    username: currentUser.username
+  });
   console.log(`Current user: ${currentUser.username} (${currentUser.id})`);
 
+  recordStep(report, "fetch_channel", "started", {
+    channelId
+  });
   const channel = await client.fetchChannel(channelId);
+  recordStep(report, "fetch_channel", "passed", {
+    channelId: channel.id,
+    channelName: channel.name,
+    channelType: channel.type
+  });
   console.log(`Contract channel: ${channel.name} (${channel.id})`);
 
+  recordStep(report, "indicate_typing", "started", {
+    channelId
+  });
   await client.indicateTyping(channelId);
+  recordStep(report, "indicate_typing", "passed", {
+    channelId
+  });
   console.log("Typing indicator sent.");
 
   const probeContent = `${probePrefix} ${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  report.probe = {
+    content: probeContent
+  };
   console.log(`Sending contract probe: ${probeContent}`);
+  recordStep(report, "send_probe", "started", {
+    channelId,
+    probeContent
+  });
   await client.sendMessage(channelId, probeContent);
+  recordStep(report, "send_probe", "passed", {
+    channelId,
+    probeContent
+  });
 
-  await waitForProbeEcho({
+  recordStep(report, "confirm_probe", "started", {
+    channelId,
+    listLimit,
+    timeoutMs
+  });
+  const confirmedMessageId = await waitForProbeEcho({
     client,
     channelId,
     probeContent,
@@ -216,21 +372,41 @@ async function main(): Promise<void> {
     limit: listLimit,
     timeoutMs
   });
+  report.probe.confirmedMessageId = confirmedMessageId;
+  recordStep(report, "confirm_probe", "passed", {
+    confirmedMessageId
+  });
 
   console.log("Live contract harness passed.");
+  report.status = "passed";
+  report.finishedAt = new Date().toISOString();
 
   if (keepAlive) {
+    recordStep(report, "keep_alive", "passed");
+    await writeReportIfConfigured(report);
     console.log("The bot is staying connected.");
     console.log("Next step: send `!ping` in the contract channel and verify that the bot replies with `pong`.");
     return;
   }
 
   console.log("Disconnecting after the contract probe.");
+  recordStep(report, "disconnect", "started");
   await client.disconnect();
+  recordStep(report, "disconnect", "passed");
+  await writeReportIfConfigured(report);
 }
 
 main().catch(async (error) => {
   if (error instanceof PlatformBootstrapError || error instanceof GatewayTransportError || error instanceof RestTransportError) {
+    if (currentReport) {
+      currentReport.status = "failed";
+      currentReport.finishedAt = new Date().toISOString();
+      currentReport.error = createErrorRecord(error);
+      recordStep(currentReport, "failed", "failed", {
+        code: error.code
+      });
+      await writeReportIfConfigured(currentReport);
+    }
     printTypedError(error);
     printTroubleshootingHint(error);
     process.exitCode = 1;
@@ -238,6 +414,15 @@ main().catch(async (error) => {
   }
 
   if (error instanceof Error) {
+    if (currentReport) {
+      currentReport.status = "failed";
+      currentReport.finishedAt = new Date().toISOString();
+      currentReport.error = createErrorRecord(error);
+      recordStep(currentReport, "failed", "failed", {
+        message: error.message
+      });
+      await writeReportIfConfigured(currentReport);
+    }
     console.error(error.message);
     printTroubleshootingHint(error);
     printUsage();

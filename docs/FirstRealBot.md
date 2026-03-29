@@ -6,7 +6,7 @@ Use this after the local `MockTransport` flow already makes sense.
 
 ## Goal
 
-Prove four things in order:
+Check four things in order:
 
 1. the instance can be discovered
 2. the gateway/bootstrap path works
