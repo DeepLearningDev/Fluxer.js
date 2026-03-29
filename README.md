@@ -139,10 +139,10 @@ If you are targeting the official hosted Fluxer platform and need an honest host
 npm run dev:hosted
 ```
 
-That path also supports `FLUXER_HOSTED_REPORT_PATH` and is documented in [docs/HostedInstanceConfidence.md](./docs/HostedInstanceConfidence.md).
+That path also supports `FLUXER_HOSTED_REPORT_PATH` and is documented in the wiki: https://github.com/DeepLearningDev/Fluxer.js/wiki/Hosted-Instance-Confidence
 It now proves hosted gateway delivery for the live probe, hosted identity fetch, channel read-back, direct `fetchMessage(...)`, an edit-plus-refetch cycle, typed delete confirmation, and deleted-history absence on the confirmed probe.
 
-These examples live in `src/examples/real-instance-bootstrap.ts`, `src/examples/live-instance-contract.ts`, and `src/examples/hosted-instance-confidence.ts` and are documented in [docs/RealInstanceBootstrap.md](./docs/RealInstanceBootstrap.md), [docs/FirstRealBot.md](./docs/FirstRealBot.md), [docs/LiveInstanceContractHarness.md](./docs/LiveInstanceContractHarness.md), and [docs/HostedInstanceConfidence.md](./docs/HostedInstanceConfidence.md). They are meant to prove narrow live confidence layers, not to stand in for a full live contract matrix.
+These examples live in `src/examples/real-instance-bootstrap.ts`, `src/examples/live-instance-contract.ts`, and `src/examples/hosted-instance-confidence.ts` and are documented in the wiki: [Real Instance Bootstrap](https://github.com/DeepLearningDev/Fluxer.js/wiki/Real-Instance-Bootstrap), [First Real Bot](https://github.com/DeepLearningDev/Fluxer.js/wiki/First-Real-Bot), [Live Contract Harness](https://github.com/DeepLearningDev/Fluxer.js/wiki/Live-Contract-Harness), and [Hosted Instance Confidence](https://github.com/DeepLearningDev/Fluxer.js/wiki/Hosted-Instance-Confidence). They are meant to prove narrow live confidence layers, not to stand in for a full live contract matrix.
 
 ## What You Get Today
 
@@ -157,27 +157,28 @@ These examples live in `src/examples/real-instance-bootstrap.ts`, `src/examples/
 
 ## Docs And Guides
 
-Guide layer:
+The wiki is now the docs surface for Fluxer.JS.
 
 - Wiki home: https://github.com/DeepLearningDev/Fluxer.js/wiki
 - Getting started: https://github.com/DeepLearningDev/Fluxer.js/wiki/Getting-Started
 - Core concepts: https://github.com/DeepLearningDev/Fluxer.js/wiki/Core-Concepts
+- Commands and conversations: https://github.com/DeepLearningDev/Fluxer.js/wiki/Commands-And-Conversations
 - Transport and runtime: https://github.com/DeepLearningDev/Fluxer.js/wiki/Transport-And-Runtime
-
-Reference docs:
-
+- Real instance bootstrap: https://github.com/DeepLearningDev/Fluxer.js/wiki/Real-Instance-Bootstrap
+- First real bot: https://github.com/DeepLearningDev/Fluxer.js/wiki/First-Real-Bot
+- Hosted instance confidence: https://github.com/DeepLearningDev/Fluxer.js/wiki/Hosted-Instance-Confidence
+- Live contract harness: https://github.com/DeepLearningDev/Fluxer.js/wiki/Live-Contract-Harness
+- Waits and collectors: https://github.com/DeepLearningDev/Fluxer.js/wiki/Waits-And-Collectors
+- Messages and payloads: https://github.com/DeepLearningDev/Fluxer.js/wiki/Messages-And-Payloads
+- Testing and release: https://github.com/DeepLearningDev/Fluxer.js/wiki/Testing-And-Release
+- Release policy: https://github.com/DeepLearningDev/Fluxer.js/wiki/Release-Policy
+- API guarantees: https://github.com/DeepLearningDev/Fluxer.js/wiki/API-Guarantees
+- Gateway error codes: https://github.com/DeepLearningDev/Fluxer.js/wiki/Gateway-Error-Codes
+- REST error codes: https://github.com/DeepLearningDev/Fluxer.js/wiki/REST-Error-Codes
+- Gateway event contract: https://github.com/DeepLearningDev/Fluxer.js/wiki/Gateway-Event-Contract
+- Migration notes: https://github.com/DeepLearningDev/Fluxer.js/wiki/Migration-From-DiscordJS
+- Plugin packaging conventions: https://github.com/DeepLearningDev/Fluxer.js/wiki/Plugin-Packaging
 - Changelog: [CHANGELOG.md](./CHANGELOG.md)
-- Release policy: [docs/ReleasePolicy.md](./docs/ReleasePolicy.md)
-- Real instance bootstrap: [docs/RealInstanceBootstrap.md](./docs/RealInstanceBootstrap.md)
-- First real bot: [docs/FirstRealBot.md](./docs/FirstRealBot.md)
-- Live instance contract harness: [docs/LiveInstanceContractHarness.md](./docs/LiveInstanceContractHarness.md)
-- Hosted instance confidence: [docs/HostedInstanceConfidence.md](./docs/HostedInstanceConfidence.md)
-- Waits and collectors: [docs/WaitsAndCollectors.md](./docs/WaitsAndCollectors.md)
-- API guarantees: [docs/ApiGuarantees.md](./docs/ApiGuarantees.md)
-- Gateway error codes: [docs/GatewayErrorCodes.md](./docs/GatewayErrorCodes.md)
-- REST error codes: [docs/RestErrorCodes.md](./docs/RestErrorCodes.md)
-- Migration notes: [docs/MigrationFromDiscordJS.md](./docs/MigrationFromDiscordJS.md)
-- Plugin packaging conventions: [docs/PluginPackaging.md](./docs/PluginPackaging.md)
 
 ## Repo Workflow
 
