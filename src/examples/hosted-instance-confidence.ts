@@ -56,6 +56,10 @@ interface HostedConfidenceReport {
     confirmedMessageId?: string;
     fetchedMessageId?: string;
     fetchedMessageContent?: string;
+    editedContent?: string;
+    editedMessageId?: string;
+    fetchedEditedMessageId?: string;
+    fetchedEditedMessageContent?: string;
   };
   steps: ConfidenceStepRecord[];
   error?: {
@@ -549,6 +553,34 @@ async function main(): Promise<void> {
     messageId: fetchedMessage.id
   });
   console.log(`Fetched confirmed probe directly: ${fetchedMessage.id}`);
+
+  const editedProbeContent = `${probeContent} [edited]`;
+  recordStep(report, "edit_probe", "started", {
+    channelId,
+    messageId: confirmedMessageId
+  });
+  const editedMessage = await client.editMessage(channelId, confirmedMessageId, editedProbeContent);
+  report.probe.editedContent = editedProbeContent;
+  report.probe.editedMessageId = editedMessage.id;
+  recordStep(report, "edit_probe", "passed", {
+    messageId: editedMessage.id
+  });
+  console.log(`Edited confirmed probe: ${editedMessage.id}`);
+
+  recordStep(report, "fetch_edited_probe", "started", {
+    channelId,
+    messageId: confirmedMessageId
+  });
+  const fetchedEditedMessage = await client.fetchMessage(channelId, confirmedMessageId);
+  if (fetchedEditedMessage.content !== editedProbeContent) {
+    throw new Error("Edited probe content did not match the expected fetched content.");
+  }
+  report.probe.fetchedEditedMessageId = fetchedEditedMessage.id;
+  report.probe.fetchedEditedMessageContent = fetchedEditedMessage.content;
+  recordStep(report, "fetch_edited_probe", "passed", {
+    messageId: fetchedEditedMessage.id
+  });
+  console.log(`Fetched edited probe directly: ${fetchedEditedMessage.id}`);
 
   recordStep(report, "disconnect", "started");
   await client.disconnect();

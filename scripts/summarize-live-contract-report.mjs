@@ -77,6 +77,18 @@ function renderSummary(report, inputPath) {
     if (report.probe.fetchedMessageContent) {
       lines.push(`- Direct fetch content: ${String(report.probe.fetchedMessageContent)}`);
     }
+    if (report.probe.editedMessageId) {
+      lines.push(`- Edited message ID: ${String(report.probe.editedMessageId)}`);
+    }
+    if (report.probe.editedContent) {
+      lines.push(`- Edited content: ${String(report.probe.editedContent)}`);
+    }
+    if (report.probe.fetchedEditedMessageId) {
+      lines.push(`- Fetched edited message ID: ${String(report.probe.fetchedEditedMessageId)}`);
+    }
+    if (report.probe.fetchedEditedMessageContent) {
+      lines.push(`- Fetched edited content: ${String(report.probe.fetchedEditedMessageContent)}`);
+    }
     lines.push("");
   }
 

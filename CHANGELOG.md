@@ -22,6 +22,7 @@ with pre-release channels while the framework is not yet stable.
 - the repo now exposes an opt-in live-instance contract harness that checks a real channel fetch, typing signal, probe send, and read-back through recent channel history
 - wait and collector guidance now has a dedicated guide in both the repo docs and the GitHub wiki
 - the hosted confidence path now also fetches the confirmed probe directly by message ID so the hosted lane proves one more honest read surface
+- the hosted confidence path now also edits the confirmed probe and re-fetches it so the hosted lane proves one more honest message-lifecycle step
 
 ### Fixed
 
