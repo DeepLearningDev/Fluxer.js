@@ -1677,6 +1677,90 @@ test("indicates typing activity through rest transport", async () => {
   ]);
 });
 
+test("emits typed diagnostics when typing requests fail before a response", async () => {
+  const transport = new RestTransport({
+    baseUrl: "https://fluxer.local/api",
+    fetchImpl: async () => {
+      throw new Error("socket hang up");
+    }
+  });
+
+  await assert.rejects(async () => {
+    await transport.indicateTyping("general");
+  }, (error: unknown) => {
+    assert.ok(error instanceof RestTransportError);
+    assert.equal(error.code, "REST_REQUEST_FAILED");
+    assert.equal(error.retryable, true);
+    assert.equal(error.details?.method, "POST");
+    assert.equal(error.details?.url, "https://fluxer.local/api/v1/channels/general/typing");
+    assert.equal(error.details?.channelId, "general");
+    assert.equal(error.details?.message, "socket hang up");
+    return true;
+  });
+});
+
+test("emits typed diagnostics for typing http failures", async () => {
+  const transport = new RestTransport({
+    baseUrl: "https://fluxer.local/api",
+    fetchImpl: async () =>
+      new Response("denied", {
+        status: 403,
+        statusText: "Forbidden"
+      })
+  });
+
+  await assert.rejects(async () => {
+    await transport.indicateTyping("general");
+  }, (error: unknown) => {
+    assert.ok(error instanceof RestTransportError);
+    assert.equal(error.code, "REST_HTTP_ERROR");
+    assert.equal(error.status, 403);
+    assert.equal(error.retryable, false);
+    assert.equal(error.details?.method, "POST");
+    assert.equal(error.details?.url, "https://fluxer.local/api/v1/channels/general/typing");
+    assert.equal(error.details?.channelId, "general");
+    assert.equal(error.details?.statusText, "Forbidden");
+    assert.equal(error.details?.responseBody, "denied");
+    return true;
+  });
+});
+
+test("emits typed diagnostics for typing rate limits with retry metadata", async () => {
+  const transport = new RestTransport({
+    baseUrl: "https://fluxer.local/api",
+    fetchImpl: async () =>
+      createRateLimitedResponse({
+        body: {
+          retry_after: 1.25,
+          global: false
+        },
+        headers: {
+          "content-type": "application/json",
+          "x-ratelimit-reset-after": "1.5",
+          "x-ratelimit-bucket": "typing:general"
+        }
+      })
+  });
+
+  await assert.rejects(async () => {
+    await transport.indicateTyping("general");
+  }, (error: unknown) => {
+    assert.ok(error instanceof RestTransportError);
+    assert.equal(error.code, "REST_RATE_LIMITED");
+    assert.equal(error.status, 429);
+    assert.equal(error.retryable, true);
+    assert.equal(error.retryAfterMs, 1500);
+    assert.equal(error.details?.method, "POST");
+    assert.equal(error.details?.url, "https://fluxer.local/api/v1/channels/general/typing");
+    assert.equal(error.details?.channelId, "general");
+    assert.equal(error.details?.retryAfterMs, 1500);
+    assert.equal(error.details?.retryAfterSource, "reset_after");
+    assert.equal(error.details?.bucket, "typing:general");
+    assert.equal(error.details?.global, false);
+    return true;
+  });
+});
+
 test("client proxies message lifecycle operations through mock transport", async () => {
   const transport = new MockTransport();
   const client = new FluxerClient(transport);

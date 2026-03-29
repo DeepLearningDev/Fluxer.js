@@ -34,7 +34,7 @@ Current alpha caveats:
 - the runtime is test-backed, but the Fluxer gateway lifecycle contract is still partially inferred from Discord-compatible guidance while dedicated Fluxer lifecycle docs remain incomplete
 - malformed non-message gateway dispatches now emit warning-level client debug diagnostics instead of failing silently
 - the REST layer is still intentionally narrow, but it now covers bootstrap/discovery plus core channel reads and message operations: fetch channel, list messages, send, fetch, edit, and delete messages
-- the REST negative-path matrix now has focused coverage for identity reads, channel reads, invite and guild reads, lifecycle operations, and pinned-message flows, including rate-limit metadata precedence and invalid-response handling
+- the REST negative-path matrix now has focused coverage for identity reads, channel reads, invite and guild reads, message lifecycle operations, pinned-message flows, and typing/write request failures, including rate-limit metadata precedence and invalid-response handling where applicable
 - real-instance bootstrap through `createFluxerPlatformTransport(...)` exposes typed `PlatformBootstrapError` failures for discovery, gateway-info, and unsupported-capability startup paths
 - REST rate limits are surfaced as typed errors with retry metadata when available, but automatic retry/backoff is not implemented yet
 
