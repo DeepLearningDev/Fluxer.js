@@ -17,6 +17,7 @@ with pre-release channels while the framework is not yet stable.
 
 - README is now a tighter entry page with a clearer install path, docs navigation, and current-limitations framing
 - the GitHub wiki now hosts the guide-layer docs, and the main repo README points there instead of carrying a duplicate local wiki layer
+- release verification now proves a packaged composed platform-transport smoke path instead of only checking the platform bootstrap surface at type level
 
 ### Fixed
 
