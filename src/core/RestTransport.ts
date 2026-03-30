@@ -833,19 +833,19 @@ function parseRestInvite(
   }
 ): FluxerInvite {
   const invite = payload as {
-    code?: string;
-    guild?: { id?: string };
-    channel?: { id?: string };
+    code?: unknown;
+    guild?: { id?: unknown };
+    channel?: { id?: unknown };
     inviter?: unknown;
-    temporary?: boolean;
-    uses?: number;
-    max_uses?: number;
-    max_age?: number;
+    temporary?: unknown;
+    uses?: unknown;
+    max_uses?: unknown;
+    max_age?: unknown;
     created_at?: string | null;
     expires_at?: string | null;
   };
 
-  if (!invite?.code) {
+  if (typeof invite?.code !== "string") {
     throw new RestTransportError({
       message: "RestTransport received an invite response with missing required fields.",
       code: "REST_RESPONSE_INVALID",
@@ -857,7 +857,7 @@ function parseRestInvite(
     });
   }
 
-  if (invite.guild !== undefined && invite.guild?.id === undefined) {
+  if (invite.guild !== undefined && typeof invite.guild?.id !== "string") {
     throw new RestTransportError({
       message: "RestTransport received an invite response with an invalid guild shape.",
       code: "REST_RESPONSE_INVALID",
@@ -869,7 +869,7 @@ function parseRestInvite(
     });
   }
 
-  if (invite.channel !== undefined && invite.channel?.id === undefined) {
+  if (invite.channel !== undefined && typeof invite.channel?.id !== "string") {
     throw new RestTransportError({
       message: "RestTransport received an invite response with an invalid channel shape.",
       code: "REST_RESPONSE_INVALID",
@@ -881,14 +881,33 @@ function parseRestInvite(
     });
   }
 
+  if (
+    (invite.temporary !== undefined && typeof invite.temporary !== "boolean")
+    || (invite.uses !== undefined && typeof invite.uses !== "number")
+    || (invite.max_uses !== undefined && typeof invite.max_uses !== "number")
+    || (invite.max_age !== undefined && typeof invite.max_age !== "number")
+  ) {
+    throw new RestTransportError({
+      message: "RestTransport received an invite response with invalid optional field types.",
+      code: "REST_RESPONSE_INVALID",
+      retryable: false,
+      details: {
+        ...context,
+        payload
+      }
+    });
+  }
+
   const inviter = invite.inviter ? parseRestUser(invite.inviter, context) : undefined;
+  const guildId = typeof invite.guild?.id === "string" ? invite.guild.id : undefined;
+  const channelId = typeof invite.channel?.id === "string" ? invite.channel.id : undefined;
   const createdAt = parseOptionalDateTime(invite.created_at, context, payload, "creation");
   const expiresAt = parseOptionalDateTime(invite.expires_at, context, payload, "expiration");
 
   return {
     code: invite.code,
-    guildId: invite.guild?.id,
-    channelId: invite.channel?.id,
+    guildId,
+    channelId,
     ...(inviter ? { inviter } : {}),
     ...(invite.temporary !== undefined ? { temporary: invite.temporary } : {}),
     ...(invite.uses !== undefined ? { uses: invite.uses } : {}),

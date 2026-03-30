@@ -1416,6 +1416,86 @@ test("drops guild role gateway events with invalid role field types and emits wa
   );
 });
 
+test("drops invite gateway events with invalid optional field types and emits warnings", async () => {
+  const transport = new MockTransport();
+  const client = new FluxerClient(transport);
+  const debugEvents: Array<{ event: string; level?: string; data?: Record<string, unknown> }> = [];
+  const domainEvents: string[] = [];
+
+  client.on("debug", (event) => {
+    debugEvents.push({
+      event: event.event,
+      level: event.level,
+      data: event.data as Record<string, unknown> | undefined
+    });
+  });
+
+  client.on("inviteCreate", () => {
+    domainEvents.push("inviteCreate");
+  });
+
+  client.on("inviteDelete", () => {
+    domainEvents.push("inviteDelete");
+  });
+
+  await client.receiveGatewayDispatch({
+    type: "INVITE_CREATE",
+    sequence: 19,
+    data: {
+      code: "welcome123",
+      channel_id: "general",
+      uses: "zero",
+      temporary: false
+    },
+    raw: {
+      op: 0,
+      d: {
+        code: "welcome123",
+        channel_id: "general",
+        uses: "zero",
+        temporary: false
+      },
+      s: 19,
+      t: "INVITE_CREATE"
+    }
+  });
+
+  await client.receiveGatewayDispatch({
+    type: "INVITE_DELETE",
+    sequence: 20,
+    data: {
+      code: "welcome123",
+      guild_id: 42,
+      temporary: "no"
+    },
+    raw: {
+      op: 0,
+      d: {
+        code: "welcome123",
+        guild_id: 42,
+        temporary: "no"
+      },
+      s: 20,
+      t: "INVITE_DELETE"
+    }
+  });
+
+  assert.deepEqual(domainEvents, []);
+
+  const ignoredEvents = debugEvents.filter((event) => event.event === "gateway_dispatch_ignored");
+  assert.deepEqual(
+    ignoredEvents.map((event) => ({
+      level: event.level,
+      type: event.data?.type,
+      reason: event.data?.reason
+    })),
+    [
+      { level: "warn", type: "INVITE_CREATE", reason: "invalid_invite_payload" },
+      { level: "warn", type: "INVITE_DELETE", reason: "invalid_invite_payload" }
+    ]
+  );
+});
+
 test("maps role, reaction, and voice gateway events", async () => {
   const transport = new MockTransport();
   const client = new FluxerClient(transport);

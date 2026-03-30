@@ -1133,6 +1133,27 @@ test("fetches invite information through rest transport", async () => {
   });
 });
 
+test("rejects invalid invite field types from rest transport", async () => {
+  const transport = new RestTransport({
+    baseUrl: "https://fluxer.local/api",
+    fetchImpl: async () =>
+      createRestInviteResponse({
+        temporary: "no" as unknown as boolean
+      })
+  });
+
+  await assert.rejects(async () => {
+    await transport.fetchInvite("fluxer");
+  }, (error: unknown) => {
+    assert.ok(error instanceof RestTransportError);
+    assert.equal(error.code, "REST_RESPONSE_INVALID");
+    assert.equal(error.details?.method, "GET");
+    assert.equal(error.details?.url, "https://fluxer.local/api/v1/invites/fluxer");
+    assert.equal(error.details?.inviteCode, "fluxer");
+    return true;
+  });
+});
+
 test("fetches guilds through rest transport", async () => {
   const requests: string[] = [];
 

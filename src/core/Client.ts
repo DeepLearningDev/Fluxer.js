@@ -1376,33 +1376,49 @@ export class FluxerClient extends EventEmitter {
 
   #parseGatewayInvite(event: FluxerGatewayDispatchEvent): FluxerInvite | null {
     const payload = event.data as {
-      code?: string;
-      channel_id?: string;
-      guild_id?: string;
+      code?: unknown;
+      channel_id?: unknown;
+      guild_id?: unknown;
       inviter?: { id?: string; username?: string; global_name?: string; bot?: boolean };
-      uses?: number;
-      max_uses?: number;
-      max_age?: number;
-      temporary?: boolean;
+      uses?: unknown;
+      max_uses?: unknown;
+      max_age?: unknown;
+      temporary?: unknown;
       created_at?: string;
       expires_at?: string | null;
     };
 
+    const channelId = this.#parseOptionalString(payload.channel_id);
+    const guildId = this.#parseOptionalString(payload.guild_id);
+    const uses = this.#parseOptionalNumber(payload.uses);
+    const maxUses = this.#parseOptionalNumber(payload.max_uses);
+    const maxAgeSeconds = this.#parseOptionalNumber(payload.max_age);
+    const temporary = this.#parseOptionalBoolean(payload.temporary);
     const createdAt = this.#parseOptionalIsoDate(payload.created_at);
     const expiresAt = this.#parseOptionalIsoDate(payload.expires_at);
-    if (!payload.code || createdAt === null || expiresAt === null) {
+    if (
+      typeof payload.code !== "string"
+      || channelId === null
+      || guildId === null
+      || uses === null
+      || maxUses === null
+      || maxAgeSeconds === null
+      || temporary === null
+      || createdAt === null
+      || expiresAt === null
+    ) {
       return null;
     }
 
     return {
       code: payload.code,
-      channelId: payload.channel_id,
-      guildId: payload.guild_id,
+      channelId,
+      guildId,
       inviter: this.#parseGatewayUser(payload.inviter) ?? undefined,
-      uses: payload.uses,
-      maxUses: payload.max_uses,
-      maxAgeSeconds: payload.max_age,
-      temporary: payload.temporary,
+      uses,
+      maxUses,
+      maxAgeSeconds,
+      temporary,
       createdAt,
       expiresAt
     };
@@ -1456,6 +1472,14 @@ export class FluxerClient extends EventEmitter {
     }
 
     return typeof value === "number" ? value : null;
+  }
+
+  #parseOptionalBoolean(value: unknown): boolean | undefined | null {
+    if (value === undefined || value === null) {
+      return undefined;
+    }
+
+    return typeof value === "boolean" ? value : null;
   }
 
   #parseGatewayUser(payload: unknown): FluxerUser | null {
