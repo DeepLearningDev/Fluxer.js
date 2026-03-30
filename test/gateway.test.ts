@@ -1496,6 +1496,86 @@ test("drops invite gateway events with invalid optional field types and emits wa
   );
 });
 
+test("drops voice gateway events with invalid field types and emits warnings", async () => {
+  const transport = new MockTransport();
+  const client = new FluxerClient(transport);
+  const debugEvents: Array<{ event: string; level?: string; data?: Record<string, unknown> }> = [];
+  const domainEvents: string[] = [];
+
+  client.on("debug", (event) => {
+    debugEvents.push({
+      event: event.event,
+      level: event.level,
+      data: event.data as Record<string, unknown> | undefined
+    });
+  });
+
+  client.on("voiceStateUpdate", () => {
+    domainEvents.push("voiceStateUpdate");
+  });
+
+  client.on("voiceServerUpdate", () => {
+    domainEvents.push("voiceServerUpdate");
+  });
+
+  await client.receiveGatewayDispatch({
+    type: "VOICE_STATE_UPDATE",
+    sequence: 21,
+    data: {
+      guild_id: "guild_1",
+      user_id: "user_1",
+      session_id: "session_1",
+      self_mute: "no"
+    },
+    raw: {
+      op: 0,
+      d: {
+        guild_id: "guild_1",
+        user_id: "user_1",
+        session_id: "session_1",
+        self_mute: "no"
+      },
+      s: 21,
+      t: "VOICE_STATE_UPDATE"
+    }
+  });
+
+  await client.receiveGatewayDispatch({
+    type: "VOICE_SERVER_UPDATE",
+    sequence: 22,
+    data: {
+      guild_id: "guild_1",
+      token: "voice-token",
+      endpoint: 42
+    },
+    raw: {
+      op: 0,
+      d: {
+        guild_id: "guild_1",
+        token: "voice-token",
+        endpoint: 42
+      },
+      s: 22,
+      t: "VOICE_SERVER_UPDATE"
+    }
+  });
+
+  assert.deepEqual(domainEvents, []);
+
+  const ignoredEvents = debugEvents.filter((event) => event.event === "gateway_dispatch_ignored");
+  assert.deepEqual(
+    ignoredEvents.map((event) => ({
+      level: event.level,
+      type: event.data?.type,
+      reason: event.data?.reason
+    })),
+    [
+      { level: "warn", type: "VOICE_STATE_UPDATE", reason: "invalid_voice_state_payload" },
+      { level: "warn", type: "VOICE_SERVER_UPDATE", reason: "invalid_voice_server_payload" }
+    ]
+  );
+});
+
 test("maps role, reaction, and voice gateway events", async () => {
   const transport = new MockTransport();
   const client = new FluxerClient(transport);

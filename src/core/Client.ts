@@ -1324,53 +1324,75 @@ export class FluxerClient extends EventEmitter {
 
   #parseVoiceState(event: FluxerGatewayDispatchEvent): FluxerVoiceState | null {
     const payload = event.data as {
-      guild_id?: string;
-      channel_id?: string | null;
-      user_id?: string;
-      session_id?: string;
-      deaf?: boolean;
-      mute?: boolean;
-      self_deaf?: boolean;
-      self_mute?: boolean;
-      self_stream?: boolean;
-      self_video?: boolean;
-      suppress?: boolean;
+      guild_id?: unknown;
+      channel_id?: unknown;
+      user_id?: unknown;
+      session_id?: unknown;
+      deaf?: unknown;
+      mute?: unknown;
+      self_deaf?: unknown;
+      self_mute?: unknown;
+      self_stream?: unknown;
+      self_video?: unknown;
+      suppress?: unknown;
     };
 
-    if (!payload.user_id || !payload.session_id) {
+    const guildId = this.#parseOptionalString(payload.guild_id);
+    const channelId = this.#parseOptionalString(payload.channel_id);
+    const deaf = this.#parseOptionalBoolean(payload.deaf);
+    const mute = this.#parseOptionalBoolean(payload.mute);
+    const selfDeaf = this.#parseOptionalBoolean(payload.self_deaf);
+    const selfMute = this.#parseOptionalBoolean(payload.self_mute);
+    const selfStream = this.#parseOptionalBoolean(payload.self_stream);
+    const selfVideo = this.#parseOptionalBoolean(payload.self_video);
+    const suppress = this.#parseOptionalBoolean(payload.suppress);
+    if (
+      typeof payload.user_id !== "string"
+      || typeof payload.session_id !== "string"
+      || guildId === null
+      || channelId === null
+      || deaf === null
+      || mute === null
+      || selfDeaf === null
+      || selfMute === null
+      || selfStream === null
+      || selfVideo === null
+      || suppress === null
+    ) {
       return null;
     }
 
     return {
-      guildId: payload.guild_id,
-      channelId: payload.channel_id ?? undefined,
+      guildId,
+      channelId,
       userId: payload.user_id,
       sessionId: payload.session_id,
-      deaf: payload.deaf,
-      mute: payload.mute,
-      selfDeaf: payload.self_deaf,
-      selfMute: payload.self_mute,
-      selfStream: payload.self_stream,
-      selfVideo: payload.self_video,
-      suppress: payload.suppress
+      deaf,
+      mute,
+      selfDeaf,
+      selfMute,
+      selfStream,
+      selfVideo,
+      suppress
     };
   }
 
   #parseVoiceServerUpdate(event: FluxerGatewayDispatchEvent): FluxerVoiceServerUpdate | null {
     const payload = event.data as {
-      guild_id?: string;
-      token?: string;
-      endpoint?: string | null;
+      guild_id?: unknown;
+      token?: unknown;
+      endpoint?: unknown;
     };
 
-    if (!payload.guild_id || !payload.token) {
+    const endpoint = this.#parseOptionalString(payload.endpoint);
+    if (typeof payload.guild_id !== "string" || typeof payload.token !== "string" || endpoint === null) {
       return null;
     }
 
     return {
       guildId: payload.guild_id,
       token: payload.token,
-      endpoint: payload.endpoint ?? undefined
+      endpoint
     };
   }
 
