@@ -1212,24 +1212,33 @@ export class FluxerClient extends EventEmitter {
 
   #parseGatewayPresence(event: FluxerGatewayDispatchEvent): FluxerPresence | null {
     const payload = event.data as {
-      user?: { id?: string };
-      status?: FluxerPresence["status"];
-      activities?: Array<{ name?: string; type?: number }>;
+      user?: { id?: unknown };
+      status?: unknown;
+      activities?: Array<{ name?: unknown; type?: unknown }>;
     };
 
-    if (!payload.user?.id || !payload.status) {
+    if (typeof payload.user?.id !== "string" || typeof payload.status !== "string") {
       return null;
+    }
+
+    const activities: Array<{ name: string; type?: number }> | undefined = payload.activities
+      ? []
+      : undefined;
+    if (payload.activities) {
+      for (const activity of payload.activities) {
+        const type = this.#parseOptionalNumber(activity.type);
+        if (typeof activity.name !== "string" || type === null) {
+          return null;
+        }
+
+        activities?.push(type === undefined ? { name: activity.name } : { name: activity.name, type });
+      }
     }
 
     return {
       userId: payload.user.id,
       status: payload.status,
-      activities: payload.activities
-        ?.filter((activity): activity is { name: string; type?: number } => typeof activity.name === "string")
-        .map((activity) => ({
-          name: activity.name,
-          type: activity.type
-        }))
+      activities
     };
   }
 

@@ -1326,6 +1326,78 @@ test("drops guild member gateway events with invalid member field types and emit
   );
 });
 
+test("drops presence gateway events with invalid field types and emits warnings", async () => {
+  const transport = new MockTransport();
+  const client = new FluxerClient(transport);
+  const debugEvents: Array<{ event: string; level?: string; data?: Record<string, unknown> }> = [];
+  const domainEvents: string[] = [];
+
+  client.on("debug", (event) => {
+    debugEvents.push({
+      event: event.event,
+      level: event.level,
+      data: event.data as Record<string, unknown> | undefined
+    });
+  });
+
+  client.on("presenceUpdate", () => {
+    domainEvents.push("presenceUpdate");
+  });
+
+  await client.receiveGatewayDispatch({
+    type: "PRESENCE_UPDATE",
+    sequence: 15,
+    data: {
+      user: { id: 42 },
+      status: "online"
+    },
+    raw: {
+      op: 0,
+      d: {
+        user: { id: 42 },
+        status: "online"
+      },
+      s: 15,
+      t: "PRESENCE_UPDATE"
+    }
+  });
+
+  await client.receiveGatewayDispatch({
+    type: "PRESENCE_UPDATE",
+    sequence: 16,
+    data: {
+      user: { id: "user_1" },
+      status: "idle",
+      activities: [{ name: "Building bots", type: "game" }]
+    },
+    raw: {
+      op: 0,
+      d: {
+        user: { id: "user_1" },
+        status: "idle",
+        activities: [{ name: "Building bots", type: "game" }]
+      },
+      s: 16,
+      t: "PRESENCE_UPDATE"
+    }
+  });
+
+  assert.deepEqual(domainEvents, []);
+
+  const ignoredEvents = debugEvents.filter((event) => event.event === "gateway_dispatch_ignored");
+  assert.deepEqual(
+    ignoredEvents.map((event) => ({
+      level: event.level,
+      type: event.data?.type,
+      reason: event.data?.reason
+    })),
+    [
+      { level: "warn", type: "PRESENCE_UPDATE", reason: "invalid_presence_payload" },
+      { level: "warn", type: "PRESENCE_UPDATE", reason: "invalid_presence_payload" }
+    ]
+  );
+});
+
 test("drops guild role gateway events with invalid role field types and emits warnings", async () => {
   const transport = new MockTransport();
   const client = new FluxerClient(transport);
